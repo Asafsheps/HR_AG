@@ -1,0 +1,6 @@
+{
+  "name": "מערכת גיוס חכמה - CRM & AI Agent",
+  "description": "מערכת גיוס קלה ומתקדמת ל-HR הכוללת סוכן AI לשיחות וואטסאפ, מבדקי מועמדים אוטומטיים, מערכת CRM וניהול חוזים",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
