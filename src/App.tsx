@@ -2059,7 +2059,7 @@ export default function App() {
                         value={whatsappInputValue}
                         onChange={(e) => setWhatsappInputValue(e.target.value)}
                         disabled={isBotResponding}
-                        className="flex-1 px-3.5 py-2 text-xs bg-white border border-slate-300 rounded-full focus:outline-none focus:border-emerald-600 disabled:opacity-70 text-right"
+                        className="flex-1 px-3.5 py-2 text-xs bg-white border border-slate-300 rounded-full focus:outline-none focus:border-emerald-600 disabled:opacity-70 text-right text-slate-900"
                       />
                       <button
                         type="submit"
@@ -2371,7 +2371,7 @@ export default function App() {
                     placeholder="לדוגמה: מפתח Fullstack / מנהל מוצר..."
                     value={newPositionTitle}
                     onChange={(e) => setNewPositionTitle(e.target.value)}
-                    className="p-2 text-xs border border-slate-200 rounded focus:outline-none focus:border-emerald-600"
+                    className="p-2 text-xs border border-slate-200 rounded focus:outline-none focus:border-emerald-600 text-slate-900 bg-white"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
@@ -2383,7 +2383,7 @@ export default function App() {
                     required
                     value={newPositionExperience}
                     onChange={(e) => setNewPositionExperience(Number(e.target.value))}
-                    className="p-2 text-xs border border-slate-200 rounded focus:outline-none focus:border-emerald-600"
+                    className="p-2 text-xs border border-slate-200 rounded focus:outline-none focus:border-emerald-600 text-slate-900 bg-white"
                   />
                 </div>
               </div>
@@ -2407,7 +2407,7 @@ export default function App() {
                     placeholder={`דרישה ${idx + 1}, למשל: הבנה עמוקה ב-SQL או ניסיון בפיתוח React`}
                     value={req}
                     onChange={(e) => handleReqFieldChange(idx, e.target.value)}
-                    className="p-2 text-xs border border-slate-200 rounded focus:outline-none focus:border-emerald-600 mt-1"
+                    className="p-2 text-xs border border-slate-200 rounded focus:outline-none focus:border-emerald-600 mt-1 text-slate-900 bg-white"
                   />
                 ))}
               </div>
@@ -2431,7 +2431,7 @@ export default function App() {
                     placeholder={`שאלה ${idx + 1}, למשל: "תאר פרויקט משמעותי שבנית ב-React"`}
                     value={q}
                     onChange={(e) => handleQuestionFieldChange(idx, e.target.value)}
-                    className="p-2 text-xs border border-slate-200 rounded focus:outline-none focus:border-emerald-600 mt-1"
+                    className="p-2 text-xs border border-slate-200 rounded focus:outline-none focus:border-emerald-600 mt-1 text-slate-900 bg-white"
                   />
                 ))}
               </div>
@@ -2443,7 +2443,7 @@ export default function App() {
                   placeholder="הוראות מפורטות לתרגיל המעשי. ה-AI ינסח מבדק רלוונטי למועמד ויהיה אחראי לבדוק ולתת הערכה מקצועית. למשל: 'שאלה על חישוב ממוצע ב-SQL וטיפול ברזולוציות של responsive design'."
                   value={newPositionTestPrompt}
                   onChange={(e) => setNewPositionTestPrompt(e.target.value)}
-                  className="p-2 text-xs h-20 border border-slate-200 rounded focus:outline-none focus:border-emerald-600"
+                  className="p-2 text-xs h-20 border border-slate-200 rounded focus:outline-none focus:border-emerald-600 text-slate-900 bg-white"
                 />
               </div>
 
@@ -2454,7 +2454,7 @@ export default function App() {
                   placeholder="כתוב נוסח בסיסי של חוזה ההעסקה. תוכל להשתמש בפרמטרים מוחלפים כגון {name} ו-{salary}."
                   value={newPositionContract}
                   onChange={(e) => setNewPositionContract(e.target.value)}
-                  className="p-2 text-xs h-24 border border-slate-200 rounded focus:outline-none focus:border-emerald-600 font-mono"
+                  className="p-2 text-xs h-24 border border-slate-200 rounded focus:outline-none focus:border-emerald-600 font-mono text-slate-900 bg-white"
                   dir="rtl"
                 />
               </div>
