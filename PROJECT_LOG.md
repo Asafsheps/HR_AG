@@ -67,13 +67,27 @@ The `Saas-Factory` directory (`C:\Users\asafs\OneDrive\שולחן העבודה\N
 
 ---
 
-## 6. Execution Status & Next Steps
+## 6. Telegram Remote Approval Integration
+
+To allow the user to manage and approve tasks when away from the computer, a helper script has been integrated:
+- **Location**: [`telegram_helper.js`](file:///C:/Users/asafs/OneDrive/שולחן%20העבודה/New%20folder/עבודה/עצמאי/HR_AG/telegram_helper.js)
+- **Functions**:
+  - `sendMsg(text)`: Sends a UTF-8 encoded text message prefixed with `🤖 [ANTIGRAVITY]`.
+  - `waitForApproval(promptText, timeoutMs)`: Sends a request for action and polls Telegram for updates, waiting for the user to respond with "כן", "מאשר", "ok", or similar before resolving to `true` (or `false` on cancel/timeout).
+- **Usage in scripts/CLI**:
+  - Send message: `node telegram_helper.js send "your message"`
+  - Wait for approval: `node telegram_helper.js wait "action description"`
+
+---
+
+## 7. Execution Status & Next Steps
 
 ### Completed Actions:
 1. Created new workspace at `C:\Users\asafs\OneDrive\שולחן העבודה\New folder\עבודה\עצמאי\HR_AG`.
 2. Copied `HR_Project` core logic (Vite frontend, Express backend, Supabase DB schema).
 3. Cleaned up temporary files (`mvp_exercise_*.json`).
 4. Explored `Saas-Factory` structure.
+5. Implemented Telegram UTF-8 message notifications and remote approval helper.
 
 ### Next Steps:
 1. **Setup Git & GitHub**:

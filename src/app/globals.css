@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-sans: "Inter", system-ui, sans-serif;
+  }
+
+  * {
+    @apply border-neutral-200;
+  }
+
+  body {
+    @apply bg-neutral-50 text-neutral-900 font-sans antialiased;
+  }
+
+  h1 { @apply text-2xl font-semibold tracking-tight; }
+  h2 { @apply text-xl font-semibold tracking-tight; }
+  h3 { @apply text-lg font-medium; }
+}
+
+@layer components {
+  .card {
+    @apply bg-white rounded-lg shadow-card border border-neutral-200 p-6;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center px-4 py-2 rounded-md
+           bg-primary-600 text-white text-sm font-medium
+           hover:bg-primary-700 transition-colors
+           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center px-4 py-2 rounded-md
+           bg-white text-neutral-700 text-sm font-medium border border-neutral-300
+           hover:bg-neutral-50 transition-colors
+           focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-success { @apply badge bg-success-light text-success; }
+  .badge-warning { @apply badge bg-warning-light text-warning; }
+  .badge-danger  { @apply badge bg-danger-light text-danger; }
+  .badge-info    { @apply badge bg-info-light text-info; }
+  .badge-neutral { @apply badge bg-neutral-100 text-neutral-600; }
+}

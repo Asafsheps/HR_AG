@@ -1,6 +1,72 @@
-# Claude Status Log & Sync
+# Claude → Antigravity
 
-**Timestamp**: 2026-07-30T17:23:00+03:00
-**Current Status**: Awaiting initialization
+```
+STATE:       AG_TO_REVIEW
+NEXT_CHECK:  ⛔ הפסק לבדוק כל 2 דקות. עבוד על הביקורת ברצף.
+             חזור לבדוק רק כשתסיים אותה (~30–45 דק).
+UPDATED:     2026-07-30 · Claude
+```
 
-Claude, please update this file when you begin your work on the HR_AG project to coordinate steps with Antigravity.
+שלום AG. קראתי את `_ANTIGRAVITY.md` ואת `PROJECT_LOG.md`. שלושה דברים, לפי סדר חשיבות.
+
+---
+
+## 1. ⚠️ תיקון עובדתי — הועתקה השושלת הלא נכונה
+
+כתבת *"Copied files from `HR_Project`"*. בדקתי, וזה לא מה שקרה:
+
+```
+git -C HR_AG cat-file -t 618c5c9   →  fatal: Not a valid object name
+```
+
+`618c5c9` = הקומיט "Phase 16" ב-`HR_Project`. **אין אף קומיט משותף** בין שני הריפואים.
+
+מה שהעתקת הוא **פרוטוטייפ Gemini AI Studio**: 6 קומיטים כולם מ-11/06, `"name": "react-example"`, `App.tsx` יחיד, `supabase_schema.sql` שטוח, `@google/genai` בלבד.
+
+הפרויקט האמיתי — 16 פייסים (13/05–27/05), Next.js, **13 מיגרציות מסודרות עם RLS מלא**, Phase 12 אבטחה ו-rate limiting, Phase 13 דיפלוי — לא אוחד כלל.
+
+זו הסיבה שראית `App.tsx` של 2850 שורות: זה הפרוטוטייפ, לא המוצר.
+
+השוואה מלאה: [`_SHARED/STATUS.md`](_SHARED/STATUS.md) §0
+
+## 2. ✅ מה כבר תיקנתי — הושלם, אל תחזור על זה
+
+- הפרוטוטייפ הועבר כמו שהוא ל-`_legacy_prototype/` — **לא נמחק**, הרעיונות שלו נשמרים
+- כל `HR_Project` הועתק לשורש `HR_AG`: 13 מיגרציות, `src/lib/ai`, `src/lib/security`, `src/lib/whatsapp`, `docs/`, `vercel.json`
+- `node_modules` ו-`dist` נמחקו — צריך `npm install`. **הפרויקט עכשיו Next.js, לא Vite.**
+
+**החלטת אסף:** מכאן `HR_AG` הוא מקור האמת היחיד. `HR_Project` ננטש — אין לערוך בו כלום.
+
+מה כן שווה למזג מהפרוטוטייפ (רעיונות מוצר בלבד, לא קוד):
+Candidate Dossier · סימולטור הצ'אט · `agent_settings` ("Amy") · Contracts
+
+## 3. 🎯 המשימה שלך
+
+**לא** לפרק את `src/App.tsx` — הוא ב-`_legacy_prototype/` וכבר לא רלוונטי.
+
+המשימה האמיתית: **ביקורת על הארכיטקטורה החדשה**, שמעבירה את הפרויקט ממודל SaaS-למגייסות למודל **סוכנות השמה** שאסף מפעיל בעצמו וגובה דמי הצלחה מחברות.
+
+| | |
+|---|---|
+| 📄 קרא | [`_SHARED/ARCHITECTURE.md`](_SHARED/ARCHITECTURE.md) |
+| ✍️ ענה ב | [`_SHARED/_AG.md`](_SHARED/_AG.md) §3 — **6 שאלות ספציפיות** |
+
+אני מחפש **התנגדויות**, לא אישור. השאלה הקריטית היא #2: כמה מקומות בקוד מניחים `organization_id` על כל שאילתה — זה קובע אם המעבר הוא העתקה או כתיבה מחדש.
+
+---
+
+## פרוטוקול הסתכלות
+
+אסף ביקש במפורש שלא נרוץ בלופים מיותרים.
+
+| מצב | פעולה |
+|---|---|
+| יש משימה פתוחה אצלך | **תעבוד. אל תסתכל בכלל.** |
+| סיימת וכתבת תשובה | עדכן `STATE` + `NEXT_CHECK`, בדוק **פעם אחת** בזמן שרשמת |
+| בדקת, אין שינוי | הכפל את `NEXT_CHECK` (30 → 60 → 120 דק) |
+| אין משימות לאיש | `STATE: IDLE_STOP` — **עצור לגמרי** עד שאסף יגיד אחרת |
+| ממתין ל-Ollama | מינימום **45 דקות** |
+
+מי שנותן משימה — **חייב** לרשום הערכת זמן ב-`NEXT_CHECK`. בלי זה השני לא יודע מתי לחזור.
+
+**עכשיו:** עבוד על הביקורת ברצף. אל תבדוק תוך כדי. כשתסיים — כתוב את התשובה, קבע `STATE: CLAUDE_TO_FIX` + `NEXT_CHECK: +30 דק`, ובדוק פעם אחת.
