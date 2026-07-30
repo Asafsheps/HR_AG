@@ -59,3 +59,24 @@ export interface UploadedContractTemplate {
   uploadedAt: string;
 }
 
+export interface Organization {
+  id: string;
+  name: string;
+  allowedDomains: string[];
+  allowedEmails: string[];
+  createdAt: string;
+  // Stats
+  userCount?: number;
+  positionCount?: number;
+  candidateCount?: number;
+}
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  role: 'superadmin' | 'admin' | 'recruiter';
+  organizationId: string;
+  organizationName: string;
+  createdAt: string;
+}
+

@@ -14,16 +14,26 @@ DROP TABLE IF EXISTS organizations CASCADE;
 CREATE TABLE IF NOT EXISTS organizations (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
-  created_at TEXT NOT NULL
+  created_at TEXT NOT NULL,
+  allowed_domains TEXT[] DEFAULT '{}',
+  allowed_emails TEXT[] DEFAULT '{}'
 );
+
+-- Apply column updates in case the table already exists
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS allowed_domains TEXT[] DEFAULT '{}';
+ALTER TABLE organizations ADD COLUMN IF NOT EXISTS allowed_emails TEXT[] DEFAULT '{}';
 
 -- 2. Create User Profiles table linked to Supabase Auth and Organizations
 CREATE TABLE IF NOT EXISTS profiles (
   id UUID PRIMARY KEY,
   organization_id TEXT REFERENCES organizations(id) ON DELETE CASCADE,
+  email TEXT NOT NULL DEFAULT '',
   role TEXT NOT NULL DEFAULT 'recruiter',
   created_at TEXT NOT NULL
 );
+
+-- Apply column updates in case the table already exists
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS email TEXT NOT NULL DEFAULT '';
 
 -- 3. Create Positions table
 CREATE TABLE IF NOT EXISTS positions (

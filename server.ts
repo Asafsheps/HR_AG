@@ -18,6 +18,17 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT) : 7000;
 
 app.use(express.json());
 
+const PUBLIC_DOMAINS = new Set([
+  'gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'live.com', 
+  'icloud.com', 'aol.com', 'zoho.com', 'protonmail.com', 'proton.me', 
+  'yandex.com', 'mail.com', 'gmx.com'
+]);
+
+function getEmailDomain(email: string): string {
+  if (!email || !email.includes('@')) return '';
+  return email.split('@')[1].trim().toLowerCase();
+}
+
 // Lazy Gemini Initialization conforming to 'gemini-api' skill requirements
 let aiInstance: any = null;
 function getGemini(): GoogleGenAI {
@@ -80,6 +91,27 @@ async function requireAuth(req: any, res: any, next: any) {
       role: "admin", 
       organization_id: "default-org" 
     };
+    
+    // Support impersonation for mock testing
+    const impersonateOrg = req.headers['x-impersonate-org'];
+    if (impersonateOrg) {
+      req.user.organization_id = impersonateOrg;
+    }
+    return next();
+  }
+
+  if (token === "mock-jwt-token-for-dev-super") {
+    req.user = { 
+      id: "superadmin-id", 
+      email: "superadmin@example.com", 
+      role: "superadmin", 
+      organization_id: "superadmin-org" 
+    };
+    
+    const impersonateOrg = req.headers['x-impersonate-org'];
+    if (impersonateOrg) {
+      req.user.organization_id = impersonateOrg;
+    }
     return next();
   }
 
@@ -92,16 +124,45 @@ async function requireAuth(req: any, res: any, next: any) {
     if (error || !user) {
       return res.status(401).json({ error: "Unauthorized: Invalid or expired session token." });
     }
-    const orgId = await getUserOrganization(user.id);
+    
+    // Fetch profile to get organization_id and role
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("organization_id, role")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    const role = profile?.role || "recruiter";
+    const orgId = profile?.organization_id || "default-org";
+
     req.user = {
       ...user,
+      role: role,
       organization_id: orgId
     };
+
+    // Impersonation support for Super Admin
+    const impersonateOrg = req.headers['x-impersonate-org'];
+    if (impersonateOrg && req.user.role === 'superadmin') {
+      req.user.organization_id = impersonateOrg;
+    }
+
     next();
   } catch (err: any) {
     return res.status(401).json({ error: "Unauthorized: Authentication verification failed." });
   }
 }
+
+// --- In-Memory Organizations for Mock Mode ---
+let memOrganizations: any[] = [
+  {
+    id: "default-org",
+    name: "ארגון ברירת מחדל",
+    allowed_domains: ["example.com"],
+    allowed_emails: ["admin@example.com"],
+    created_at: "2026-05-01"
+  }
+];
 
 // --- Auth Routes ---
 app.post("/api/auth/signup", async (req, res) => {
@@ -110,73 +171,191 @@ app.post("/api/auth/signup", async (req, res) => {
     return res.status(400).json({ error: "נא להזין אימייל וסיסמה." });
   }
 
-  if (!isSupabaseConfigured()) {
-    const mockOrgId = mode === "create" ? `org-${Date.now()}` : orgId;
-    const mockOrgName = mode === "create" ? orgName : "ארגון קיים (סימולציה)";
-    return res.json({
-      token: "mock-jwt-token-for-dev",
-      user: {
-        id: `user-${Date.now()}`,
-        email,
-        role: mode === "create" ? "admin" : "recruiter",
-        organizationId: mockOrgId,
-        organizationName: mockOrgName
-      }
-    });
-  }
+  const domain = getEmailDomain(email);
 
-  try {
-    let targetOrgId = orgId;
-    let targetOrgName = "";
+  // 1. Mock Local Mode Simulation
+  if (!isSupabaseConfigured()) {
+    if (email.toLowerCase() === 'superadmin@example.com' || email.toLowerCase() === 'superadmin@hrproject.com') {
+      return res.json({
+        token: "mock-jwt-token-for-dev-super",
+        user: {
+          id: "superadmin-id",
+          email: email.toLowerCase(),
+          role: "superadmin",
+          organizationId: "superadmin-org",
+          organizationName: "ניהול על"
+        }
+      });
+    }
+
+    // Check if matches an existing organization by domain/email
+    const matchedOrg = memOrganizations.find(o => 
+      (o.allowed_domains || []).includes(domain) || 
+      (o.allowed_emails || []).includes(email.toLowerCase())
+    );
+
+    if (matchedOrg) {
+      return res.json({
+        token: "mock-jwt-token-for-dev",
+        user: {
+          id: `user-${Date.now()}`,
+          email,
+          role: "recruiter",
+          organizationId: matchedOrg.id,
+          organizationName: matchedOrg.name
+        }
+      });
+    }
 
     if (mode === "create") {
       if (!orgName) {
         return res.status(400).json({ error: "נא להזין את שם הארגון." });
       }
-      targetOrgId = `org-${Math.random().toString(36).substring(2, 9)}`;
-      targetOrgName = orgName;
-
-      // Insert organization
-      const { error: orgErr } = await supabase
-        .from("organizations")
-        .insert({ id: targetOrgId, name: targetOrgName, created_at: new Date().toISOString() });
-      
-      if (orgErr) throw orgErr;
-
-      // Seed default settings and whatsapp config for organization
-      await supabase.from("agent_settings").insert({
-        organization_id: targetOrgId,
-        persona_name: "איימי",
-        custom_objective: "לנהל שיחת סינון ראשונית בוואטסאפ עם מועמדים, לנטר פרטים אישיים וציפיות שכר מפי המועמד, לבחון מענה על שאלות ה-HR ולהפנות את המועמדים החזקים לביצוע מבדק קוד מעשי אוטומטי.",
-        conversational_tone: "friendly",
-        additional_guidelines: "1. היה תומך ומזמין.\n2. ברר בבקשה בקור רוח על שנות הניסיון.\n3. אל תשתמש במונחים טכניים מסובכים מדי."
+      const targetId = `org-${Math.random().toString(36).substring(2, 9)}`;
+      const newOrg = {
+        id: targetId,
+        name: orgName,
+        allowed_domains: PUBLIC_DOMAINS.has(domain) ? [] : [domain],
+        allowed_emails: [email.toLowerCase()],
+        created_at: new Date().toISOString()
+      };
+      memOrganizations.push(newOrg);
+      return res.json({
+        token: "mock-jwt-token-for-dev",
+        user: {
+          id: `user-${Date.now()}`,
+          email,
+          role: "admin",
+          organizationId: targetId,
+          organizationName: orgName
+        }
       });
-
-      await supabase.from("whatsapp_config").insert({
-        organization_id: targetOrgId,
-        phone_number: "",
-        access_token: "",
-        phone_number_id: "",
-        business_account_id: "",
-        webhook_verify_token: `verify_token_${Math.random().toString(36).substring(2, 10)}`,
-        provider: "sandbox_sim",
-        custom_agent_url: "",
-        is_configured: false
-      });
-    } else {
-      if (!targetOrgId) {
+    } else if (mode === "join") {
+      if (!orgId) {
         return res.status(400).json({ error: "נא להזין קוד ארגון." });
       }
-      const { data: orgData, error: orgFindErr } = await supabase
-        .from("organizations")
-        .select("name")
-        .eq("id", targetOrgId)
-        .maybeSingle();
-
-      if (orgFindErr || !orgData) {
-        return res.status(400).json({ error: "הארגון המבוקש לא קיים במערכת. בדוק את קוד הארגון." });
+      const targetOrg = memOrganizations.find(o => o.id === orgId);
+      if (!targetOrg) {
+        return res.status(400).json({ error: "הקוד שהוזן שגוי או שהארגון לא קיים." });
       }
-      targetOrgName = orgData.name;
+      return res.json({
+        token: "mock-jwt-token-for-dev",
+        user: {
+          id: `user-${Date.now()}`,
+          email,
+          role: "recruiter",
+          organizationId: targetOrg.id,
+          organizationName: targetOrg.name
+        }
+      });
+    } else {
+      return res.status(400).json({ error: "הדומיין שלך אינו משויך לארגון פעיל במערכת. אנא בחר באפשרות רישום ארגון או הזן קוד הזמנה." });
+    }
+  }
+
+  // 2. Real Supabase Production Mode
+  try {
+    let targetOrgId = "";
+    let targetOrgName = "";
+    let targetRole = "recruiter";
+
+    const isSuperAdminEmail = email.toLowerCase() === 'superadmin@hrproject.com' || email.toLowerCase() === process.env.SUPERADMIN_EMAIL?.toLowerCase();
+
+    if (isSuperAdminEmail) {
+      targetOrgId = "superadmin-org";
+      targetOrgName = "ניהול על";
+      targetRole = "superadmin";
+
+      // Seed Super Admin organization row
+      const { data: checkSuperOrg } = await supabase.from("organizations").select("id").eq("id", targetOrgId).maybeSingle();
+      if (!checkSuperOrg) {
+        await supabase.from("organizations").insert({
+          id: targetOrgId,
+          name: targetOrgName,
+          created_at: new Date().toISOString()
+        });
+      }
+    } else {
+      // Look for organization matching the email address or email domain
+      const { data: allOrgs, error: fetchOrgsErr } = await supabase.from("organizations").select("*");
+      if (fetchOrgsErr) throw fetchOrgsErr;
+
+      const matchedOrg = (allOrgs || []).find(o => 
+        (o.allowed_domains || []).includes(domain) || 
+        (o.allowed_emails || []).includes(email.toLowerCase())
+      );
+
+      if (matchedOrg) {
+        // Auto-routed based on email matching rules
+        targetOrgId = matchedOrg.id;
+        targetOrgName = matchedOrg.name;
+        targetRole = "recruiter";
+      } else {
+        // No match found - must create or join explicitly
+        if (mode === "create") {
+          if (!orgName) {
+            return res.status(400).json({ error: "נא להזין את שם הארגון." });
+          }
+          targetOrgId = `org-${Math.random().toString(36).substring(2, 9)}`;
+          targetOrgName = orgName;
+          targetRole = "admin";
+
+          // Insert organization with domain rules
+          const domains = PUBLIC_DOMAINS.has(domain) ? [] : [domain];
+          const emails = [email.toLowerCase()];
+
+          const { error: orgErr } = await supabase
+            .from("organizations")
+            .insert({ 
+              id: targetOrgId, 
+              name: targetOrgName, 
+              created_at: new Date().toISOString(),
+              allowed_domains: domains,
+              allowed_emails: emails
+            });
+          
+          if (orgErr) throw orgErr;
+
+          // Seed default settings and whatsapp config for organization
+          await supabase.from("agent_settings").insert({
+            organization_id: targetOrgId,
+            persona_name: "איימי",
+            custom_objective: "לנהל שיחת סינון ראשונית בוואטסאפ עם מועמדים, לנטר פרטים אישיים וציפיות שכר מפי המועמד, לבחון מענה על שאלות ה-HR ולהפנות את המועמדים החזקים לביצוע מבדק קוד מעשי אוטומטי.",
+            conversational_tone: "friendly",
+            additional_guidelines: "1. היה תומך ומזמין.\n2. ברר בבקשה בקור רוח על שנות הניסיון.\n3. אל תשתמש במונחים טכניים מסובכים מדי."
+          });
+
+          await supabase.from("whatsapp_config").insert({
+            organization_id: targetOrgId,
+            phone_number: "",
+            access_token: "",
+            phone_number_id: "",
+            business_account_id: "",
+            webhook_verify_token: `verify_token_${Math.random().toString(36).substring(2, 10)}`,
+            provider: "sandbox_sim",
+            custom_agent_url: "",
+            is_configured: false
+          });
+        } else if (mode === "join") {
+          if (!orgId) {
+            return res.status(400).json({ error: "נא להזין קוד ארגון (Invite Code)." });
+          }
+          const { data: orgData, error: orgFindErr } = await supabase
+            .from("organizations")
+            .select("name")
+            .eq("id", orgId)
+            .maybeSingle();
+
+          if (orgFindErr || !orgData) {
+            return res.status(400).json({ error: "הארגון המבוקש לא קיים במערכת. אנא בדוק את קוד הארגון." });
+          }
+          targetOrgId = orgId;
+          targetOrgName = orgData.name;
+          targetRole = "recruiter";
+        } else {
+          return res.status(400).json({ error: "הדומיין שלך אינו משויך לארגון פעיל במערכת. אנא בחר באפשרות רישום ארגון או הזן קוד הזמנה." });
+        }
+      }
     }
 
     const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
@@ -193,8 +372,9 @@ app.post("/api/auth/signup", async (req, res) => {
       .from("profiles")
       .insert({
         id: signUpData.user.id,
+        email: email.toLowerCase(),
         organization_id: targetOrgId,
-        role: mode === "create" ? "admin" : "recruiter",
+        role: targetRole,
         created_at: new Date().toISOString()
       });
 
@@ -205,7 +385,7 @@ app.post("/api/auth/signup", async (req, res) => {
       user: {
         id: signUpData.user.id,
         email: signUpData.user.email,
-        role: mode === "create" ? "admin" : "recruiter",
+        role: targetRole,
         organizationId: targetOrgId,
         organizationName: targetOrgName
       }
@@ -221,6 +401,20 @@ app.post("/api/auth/login", async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
     return res.status(400).json({ error: "נא להזין אימייל וסיסמה." });
+  }
+
+  // Superadmin check in mock mode
+  if ((email === "superadmin@example.com" || email === "superadmin@hrproject.com") && password === "superadmin123") {
+    return res.json({
+      token: "mock-jwt-token-for-dev-super",
+      user: {
+        id: "superadmin-id",
+        email: email,
+        role: "superadmin",
+        organizationId: "superadmin-org",
+        organizationName: "ניהול על"
+      }
+    });
   }
 
   if (email === "admin@example.com" && password === "admin123") {
@@ -245,22 +439,31 @@ app.post("/api/auth/login", async (req, res) => {
     if (error) throw error;
     if (!data.user) throw new Error("לא נמצא משתמש.");
 
-    const orgId = await getUserOrganization(data.user.id);
-    let orgName = "ארגון לא ידוע";
-    const { data: orgData } = await supabase
-      .from("organizations")
-      .select("name")
-      .eq("id", orgId)
-      .maybeSingle();
-    if (orgData) orgName = orgData.name;
-
+    // Fetch role and org details
     let role = "recruiter";
+    let orgId = "default-org";
     const { data: profileData } = await supabase
       .from("profiles")
-      .select("role")
+      .select("role, organization_id")
       .eq("id", data.user.id)
       .maybeSingle();
-    if (profileData) role = profileData.role;
+
+    if (profileData) {
+      role = profileData.role;
+      orgId = profileData.organization_id;
+    }
+
+    let orgName = "ארגון לא ידוע";
+    if (orgId === "superadmin-org") {
+      orgName = "ניהול על";
+    } else {
+      const { data: orgData } = await supabase
+        .from("organizations")
+        .select("name")
+        .eq("id", orgId)
+        .maybeSingle();
+      if (orgData) orgName = orgData.name;
+    }
 
     return res.json({
       token: data.session?.access_token,
@@ -308,6 +511,240 @@ app.get("/api/auth/me", requireAuth, async (req: any, res: any) => {
       organizationName: orgName
     }
   });
+});
+
+// --- Super Admin Middleware & Routes ---
+function requireSuperAdmin(req: any, res: any, next: any) {
+  if (req.user && req.user.role === 'superadmin') {
+    return next();
+  }
+  return res.status(403).json({ error: "עבור מנהל על בלבד." });
+}
+
+// 1. Get all organizations with stats
+app.get("/api/superadmin/organizations", requireAuth, requireSuperAdmin, async (req: any, res: any) => {
+  if (!isSupabaseConfigured()) {
+    // In-memory simulation stats
+    const mapped = memOrganizations.map(o => {
+      const userCount = o.id === "default-org" ? 1 : 0;
+      const positionCount = memPositions.filter(p => p.organization_id === o.id).length;
+      const candidateCount = memCandidates.filter(c => c.organization_id === o.id).length;
+      return {
+        id: o.id,
+        name: o.name,
+        allowedDomains: o.allowed_domains || [],
+        allowedEmails: o.allowed_emails || [],
+        createdAt: o.created_at || new Date().toISOString().split('T')[0],
+        userCount,
+        positionCount,
+        candidateCount
+      };
+    });
+    return res.json(mapped);
+  }
+
+  try {
+    const { data: orgs, error: orgsErr } = await supabase.from("organizations").select("*");
+    if (orgsErr) throw orgsErr;
+
+    const { data: profiles } = await supabase.from("profiles").select("organization_id");
+    const { data: positions } = await supabase.from("positions").select("organization_id");
+    const { data: candidates } = await supabase.from("candidates").select("organization_id");
+
+    const mapped = (orgs || []).map(o => {
+      const userCount = (profiles || []).filter(p => p.organization_id === o.id).length;
+      const positionCount = (positions || []).filter(p => p.organization_id === o.id).length;
+      const candidateCount = (candidates || []).filter(p => p.organization_id === o.id).length;
+      return {
+        id: o.id,
+        name: o.name,
+        allowedDomains: o.allowed_domains || [],
+        allowedEmails: o.allowed_emails || [],
+        createdAt: o.created_at,
+        userCount,
+        positionCount,
+        candidateCount
+      };
+    });
+    return res.json(mapped);
+  } catch (err: any) {
+    console.error("Superadmin fetch orgs error:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// 2. Create organization
+app.post("/api/superadmin/organizations", requireAuth, requireSuperAdmin, async (req: any, res: any) => {
+  const { name, allowedDomains, allowedEmails } = req.body;
+  if (!name) return res.status(400).json({ error: "נא להזין שם ארגון." });
+
+  const newId = `org-${Math.random().toString(36).substring(2, 9)}`;
+  const domains = allowedDomains || [];
+  const emails = allowedEmails || [];
+
+  if (!isSupabaseConfigured()) {
+    const newOrg = {
+      id: newId,
+      name,
+      allowed_domains: domains,
+      allowed_emails: emails,
+      created_at: new Date().toISOString().split('T')[0]
+    };
+    memOrganizations.push(newOrg);
+    return res.json({
+      id: newId,
+      name,
+      allowedDomains: domains,
+      allowedEmails: emails,
+      createdAt: newOrg.created_at
+    });
+  }
+
+  try {
+    const { data, error } = await supabase.from("organizations").insert({
+      id: newId,
+      name,
+      allowed_domains: domains,
+      allowed_emails: emails,
+      created_at: new Date().toISOString().split('T')[0]
+    }).select().single();
+
+    if (error) throw error;
+
+    // Seed default settings and configs
+    await supabase.from("agent_settings").insert({
+      organization_id: newId,
+      persona_name: "איימי",
+      custom_objective: "לנהל שיחת סינון ראשונית בוואטסאפ עם מועמדים, לנטר פרטים אישיים וציפיות שכר מפי המועמד, לבחון מענה על שאלות ה-HR ולהפנות את המועמדים החזקים לביצוע מבדק קוד מעשי אוטומטי.",
+      conversational_tone: "friendly",
+      additional_guidelines: "1. היה תומך ומזמין.\n2. ברר בבקשה בקור רוח על שנות הניסיון.\n3. אל תשתמש במונחים טכניים מסובכים מדי."
+    });
+
+    await supabase.from("whatsapp_config").insert({
+      organization_id: newId,
+      phone_number: "",
+      access_token: "",
+      phone_number_id: "",
+      business_account_id: "",
+      webhook_verify_token: `verify_token_${Math.random().toString(36).substring(2, 10)}`,
+      provider: "sandbox_sim",
+      custom_agent_url: "",
+      is_configured: false
+    });
+
+    return res.json({
+      id: newId,
+      name,
+      allowedDomains: domains,
+      allowedEmails: emails,
+      createdAt: data.created_at
+    });
+  } catch (err: any) {
+    console.error("Superadmin create org error:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// 3. Update organization
+app.put("/api/superadmin/organizations/:id", requireAuth, requireSuperAdmin, async (req: any, res: any) => {
+  const { id } = req.params;
+  const { name, allowedDomains, allowedEmails } = req.body;
+
+  if (!isSupabaseConfigured()) {
+    const idx = memOrganizations.findIndex(o => o.id === id);
+    if (idx === -1) return res.status(404).json({ error: "הארגון לא נמצא." });
+    memOrganizations[idx].name = name || memOrganizations[idx].name;
+    memOrganizations[idx].allowed_domains = allowedDomains || memOrganizations[idx].allowed_domains;
+    memOrganizations[idx].allowed_emails = allowedEmails || memOrganizations[idx].allowed_emails;
+    return res.json({
+      id,
+      name: memOrganizations[idx].name,
+      allowedDomains: memOrganizations[idx].allowed_domains,
+      allowedEmails: memOrganizations[idx].allowed_emails
+    });
+  }
+
+  try {
+    const { data, error } = await supabase.from("organizations").update({
+      name,
+      allowed_domains: allowedDomains,
+      allowed_emails: allowedEmails
+    }).eq("id", id).select().single();
+
+    if (error) throw error;
+    return res.json({
+      id,
+      name: data.name,
+      allowedDomains: data.allowed_domains,
+      allowedEmails: data.allowed_emails
+    });
+  } catch (err: any) {
+    console.error("Superadmin update org error:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// 4. Delete organization
+app.delete("/api/superadmin/organizations/:id", requireAuth, requireSuperAdmin, async (req: any, res: any) => {
+  const { id } = req.params;
+  if (id === "superadmin-org" || id === "default-org") {
+    return res.status(400).json({ error: "לא ניתן למחוק ארגון מערכת בסיסי." });
+  }
+
+  if (!isSupabaseConfigured()) {
+    memOrganizations = memOrganizations.filter(o => o.id !== id);
+    memPositions = memPositions.filter(p => p.organization_id !== id);
+    memCandidates = memCandidates.filter(c => c.organization_id !== id);
+    return res.json({ success: true });
+  }
+
+  try {
+    const { error } = await supabase.from("organizations").delete().eq("id", id);
+    if (error) throw error;
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error("Superadmin delete org error:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// 5. Get all users
+app.get("/api/superadmin/users", requireAuth, requireSuperAdmin, async (req: any, res: any) => {
+  if (!isSupabaseConfigured()) {
+    return res.json([
+      {
+        id: "admin-id",
+        email: "admin@example.com",
+        role: "admin",
+        organizationId: "default-org",
+        organizationName: "ארגון ברירת מחדל",
+        createdAt: "2026-05-01"
+      }
+    ]);
+  }
+
+  try {
+    const { data: profiles, error } = await supabase.from("profiles").select("*");
+    if (error) throw error;
+
+    const { data: orgs } = await supabase.from("organizations").select("id, name");
+
+    const mapped = (profiles || []).map(p => {
+      const orgName = (orgs || []).find(o => o.id === p.organization_id)?.name || "ארגון לא ידוע";
+      return {
+        id: p.id,
+        email: p.email || "אין מייל רשום במערכת",
+        role: p.role,
+        organizationId: p.organization_id,
+        organizationName: orgName,
+        createdAt: p.created_at
+      };
+    });
+    return res.json(mapped);
+  } catch (err: any) {
+    console.error("Superadmin fetch users error:", err);
+    return res.status(500).json({ error: err.message });
+  }
 });
 
 // REST API endpoint: Evaluate/Simulate WhatsApp HR Conversational Bot

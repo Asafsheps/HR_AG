@@ -42,7 +42,8 @@ import { INITIAL_POSITIONS, INITIAL_CANDIDATES } from './data/mockData.ts';
 
 export default function App() {
   const [token, setToken] = useState<string | null>(localStorage.getItem('recruiter_token'));
-  const [activeSection, setActiveSection] = useState<'home' | 'positions' | 'candidates' | 'whatsapp' | 'contracts' | 'settings'>('home');
+  const [impersonateOrgId, setImpersonateOrgId] = useState<string | null>(localStorage.getItem('impersonate_org_id'));
+  const [activeSection, setActiveSection] = useState<'home' | 'positions' | 'candidates' | 'whatsapp' | 'contracts' | 'settings' | 'superadmin'>('home');
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [authOrgName, setAuthOrgName] = useState<string>('');
   const [authOrgId, setAuthOrgId] = useState<string>('');
@@ -55,13 +56,17 @@ export default function App() {
 
   // Helper to make authorized API calls
   const authFetch = async (url: string, options: RequestInit = {}) => {
-    const headers = {
+    const headers: any = {
       ...(options.headers || {}),
       'Authorization': `Bearer ${token}`
     };
+    if (impersonateOrgId && currentUser?.role === 'superadmin') {
+      headers['x-impersonate-org'] = impersonateOrgId;
+    }
     const response = await fetch(url, { ...options, headers });
     if (response.status === 401) {
       localStorage.removeItem('recruiter_token');
+      localStorage.removeItem('impersonate_org_id');
       setToken(null);
       setCurrentUser(null);
       throw new Error('Unauthorized');
@@ -77,11 +82,15 @@ export default function App() {
         return;
       }
       try {
-        const res = await fetch('/api/auth/me', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const savedImpersonate = localStorage.getItem('impersonate_org_id');
+        const headers: any = { 'Authorization': `Bearer ${token}` };
+        if (savedImpersonate) {
+          headers['x-impersonate-org'] = savedImpersonate;
+        }
+        const res = await fetch('/api/auth/me', { headers });
         if (res.status === 401) {
           localStorage.removeItem('recruiter_token');
+          localStorage.removeItem('impersonate_org_id');
           setToken(null);
           setCurrentUser(null);
         } else {
@@ -93,7 +102,7 @@ export default function App() {
       }
     };
     verifyToken();
-  }, [token]);
+  }, [token, impersonateOrgId]);
 
   // Load initial data from backend APIs
   const [positions, setPositions] = useState<Position[]>([]);
@@ -115,6 +124,32 @@ export default function App() {
   const [selectedContractTemplateId, setSelectedContractTemplateId] = useState<string>("baseline");
   const [liveContractText, setLiveContractText] = useState<string>('');
   const [showAgentSettings, setShowAgentSettings] = useState<boolean>(true);
+
+  // States for Super Admin dashboard management
+  const [allOrganizationsList, setAllOrganizationsList] = useState<any[]>([]);
+  const [allUsersList, setAllUsersList] = useState<any[]>([]);
+  const [superAdminLoading, setSuperAdminLoading] = useState<boolean>(false);
+
+  // Load super admin lists when role is superadmin
+  useEffect(() => {
+    if (!token || currentUser?.role !== 'superadmin') return;
+    const fetchSuperAdminData = async () => {
+      setSuperAdminLoading(true);
+      try {
+        const [orgsRes, usersRes] = await Promise.all([
+          authFetch('/api/superadmin/organizations').then(res => res.json()),
+          authFetch('/api/superadmin/users').then(res => res.json())
+        ]);
+        setAllOrganizationsList(orgsRes || []);
+        setAllUsersList(usersRes || []);
+      } catch (err) {
+        console.error("Error loading Super Admin details:", err);
+      } finally {
+        setSuperAdminLoading(false);
+      }
+    };
+    fetchSuperAdminData();
+  }, [token, currentUser?.role, activeSection, impersonateOrgId]);
 
   // State for Real WhatsApp Cloud API & AI Integration Configurations
   const [whatsappConfig, setWhatsappConfig] = useState({
@@ -192,7 +227,7 @@ export default function App() {
       }
     };
     loadAllData();
-  }, [token]);
+  }, [token, impersonateOrgId]);
 
   // Debounced save for agentSettings to backend
   useEffect(() => {
@@ -988,6 +1023,20 @@ export default function App() {
               <SlidersHorizontal className="w-4 h-4" />
               <span>הגדרות כלליות</span>
             </button>
+
+            {currentUser?.role === 'superadmin' && (
+              <button
+                onClick={() => setActiveSection('superadmin')}
+                className={`w-full px-4 py-3 rounded-xl text-xs font-bold flex items-center gap-3 transition-all cursor-pointer border border-amber-500/20 ${
+                  activeSection === 'superadmin'
+                    ? 'bg-gradient-to-r from-amber-600 to-yellow-600 text-white shadow-md shadow-amber-500/10'
+                    : 'text-amber-400 hover:text-white hover:bg-amber-950/20'
+                }`}
+              >
+                <Building className="w-4 h-4 text-amber-500" />
+                <span>ניהול על (SaaS)</span>
+              </button>
+            )}
           </nav>
         </div>
 
@@ -1026,8 +1075,36 @@ export default function App() {
               {activeSection === 'whatsapp' && "סימולטור וואטסאפ וסוכנת AI"}
               {activeSection === 'contracts' && "מרכז חוזים וטפסים מובנים"}
               {activeSection === 'settings' && "הגדרות מערכת כלליות"}
+              {activeSection === 'superadmin' && "ניהול מרובה-ארגונים (SaaS)"}
             </span>
           </div>
+
+          {/* Super Admin Tenant Switcher */}
+          {currentUser?.role === 'superadmin' && (
+            <div className="bg-amber-950/20 px-3 py-1.5 rounded-xl border border-amber-900/60 flex items-center gap-2">
+              <Building className="w-3.5 h-3.5 text-amber-500" />
+              <span className="text-amber-400 text-xs font-bold hidden sm:inline">צפה כארגון:</span>
+              <select
+                value={impersonateOrgId || ''}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === '') {
+                    localStorage.removeItem('impersonate_org_id');
+                    setImpersonateOrgId(null);
+                  } else {
+                    localStorage.setItem('impersonate_org_id', val);
+                    setImpersonateOrgId(val);
+                  }
+                }}
+                className="bg-slate-950 border border-slate-800 text-slate-100 rounded-lg px-2 py-1 text-xs focus:outline-none font-sans cursor-pointer animate-pulse"
+              >
+                <option value="">-- פאנל ניהול על (ללא התחזות) --</option>
+                {allOrganizationsList.map(o => (
+                  <option key={o.id} value={o.id}>{o.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="flex items-center gap-4">
             <div className="hidden lg:flex items-center gap-4 text-xs">
@@ -1057,11 +1134,15 @@ export default function App() {
                 <option value="whatsapp">וואטסאפ</option>
                 <option value="contracts">חוזים</option>
                 <option value="settings">הגדרות</option>
+                {currentUser?.role === 'superadmin' && (
+                  <option value="superadmin">ניהול על (SaaS)</option>
+                )}
               </select>
               
               <button
                 onClick={() => {
                   localStorage.removeItem('recruiter_token');
+                  localStorage.removeItem('impersonate_org_id');
                   setToken(null);
                 }}
                 className="p-1.5 bg-slate-800 hover:bg-red-950/40 text-slate-400 hover:text-red-400 border border-slate-700 rounded-xl transition"
@@ -2334,6 +2415,289 @@ export default function App() {
                     שמור הגדרות מתקדמות
                   </button>
                 </div>
+              </div>
+
+            </div>
+          )}
+
+          {/* VIEW: SUPER ADMIN DASHBOARD */}
+          {activeSection === 'superadmin' && currentUser?.role === 'superadmin' && (
+            <div className="max-w-7xl mx-auto flex flex-col gap-6 text-right animate-fadeIn" id="superadmin-dashboard-view">
+              
+              <div className="border-b border-slate-800 pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                  <h3 className="text-xl font-bold text-white font-sans">לוח ניהול על מרובה-ארגונים (SaaS Super Admin)</h3>
+                  <p className="text-xs text-slate-400 mt-1">ממשק שליטה לניהול לקוחות, הגדרת דומיינים מאושרים, ניטור פעילות וסטטיסטיקות מערכת.</p>
+                </div>
+                
+                {/* Create Org Action */}
+                <button
+                  onClick={() => {
+                    const name = prompt("הזן את שם הארגון החדש:");
+                    if (!name) return;
+                    const domainsStr = prompt("הזן דומיינים מאושרים (מופרדים בפסיקים, למשל: intel.com, microsoft.com):") || "";
+                    const emailsStr = prompt("הזן כתובות מייל ספציפיות מאושרות (מופרדות בפסיקים):") || "";
+                    
+                    const allowedDomains = domainsStr.split(",").map(d => d.trim().toLowerCase()).filter(d => d !== "");
+                    const allowedEmails = emailsStr.split(",").map(e => e.trim().toLowerCase()).filter(e => e !== "");
+
+                    authFetch('/api/superadmin/organizations', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ name, allowedDomains, allowedEmails })
+                    }).then(async res => {
+                      if (res.ok) {
+                        alert("הארגון נוצר בהצלחה!");
+                        // Reload lists
+                        const orgs = await authFetch('/api/superadmin/organizations').then(r => r.json());
+                        setAllOrganizationsList(orgs || []);
+                      } else {
+                        const err = await res.json();
+                        alert(`שגיאה: ${err.error || 'לא ניתן ליצור ארגון'}`);
+                      }
+                    });
+                  }}
+                  className="bg-gradient-to-r from-amber-600 to-yellow-600 hover:from-amber-500 hover:to-yellow-500 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-lg transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  <span>רישום ארגון לקוח חדש</span>
+                </button>
+              </div>
+
+              {/* Statistics Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-slate-900/60 border border-slate-805 p-5 rounded-2xl flex items-center justify-between gap-4">
+                  <div>
+                    <span className="text-[11px] text-slate-500 font-bold block">סה"כ ארגונים פעילים</span>
+                    <strong className="text-2xl font-extrabold text-white block mt-1">{allOrganizationsList.length}</strong>
+                  </div>
+                  <div className="p-3 bg-amber-500/10 rounded-xl text-amber-500">
+                    <Building className="w-6 h-6" />
+                  </div>
+                </div>
+
+                <div className="bg-slate-900/60 border border-slate-805 p-5 rounded-2xl flex items-center justify-between gap-4">
+                  <div>
+                    <span className="text-[11px] text-slate-500 font-bold block">משתמשים רשומים במערכת</span>
+                    <strong className="text-2xl font-extrabold text-white block mt-1">{allUsersList.length}</strong>
+                  </div>
+                  <div className="p-3 bg-blue-500/10 rounded-xl text-blue-400">
+                    <Users className="w-6 h-6" />
+                  </div>
+                </div>
+
+                <div className="bg-slate-900/60 border border-slate-805 p-5 rounded-2xl flex items-center justify-between gap-4">
+                  <div>
+                    <span className="text-[11px] text-slate-500 font-bold block">משרות שהוגדרו (סה"כ)</span>
+                    <strong className="text-2xl font-extrabold text-white block mt-1">
+                      {allOrganizationsList.reduce((acc, o) => acc + (o.positionCount || 0), 0)}
+                    </strong>
+                  </div>
+                  <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-400">
+                    <Briefcase className="w-6 h-6" />
+                  </div>
+                </div>
+
+                <div className="bg-slate-900/60 border border-slate-805 p-5 rounded-2xl flex items-center justify-between gap-4">
+                  <div>
+                    <span className="text-[11px] text-slate-500 font-bold block">מועמדים במערכת (סה"כ)</span>
+                    <strong className="text-2xl font-extrabold text-white block mt-1">
+                      {allOrganizationsList.reduce((acc, o) => acc + (o.candidateCount || 0), 0)}
+                    </strong>
+                  </div>
+                  <div className="p-3 bg-teal-500/10 rounded-xl text-teal-450">
+                    <UserCheck className="w-6 h-6" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Main Content Pane */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                
+                {/* Organizations Table (Left Column) */}
+                <div className="lg:col-span-8 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm space-y-4">
+                  <h4 className="text-sm font-bold text-white flex items-center gap-2 border-b border-slate-800 pb-3">
+                    <Building className="w-5 h-5 text-amber-500" />
+                    <span>ניהול ארגוני לקוחות ופוליסי גישה</span>
+                  </h4>
+
+                  {superAdminLoading ? (
+                    <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                      <Loader2 className="w-8 h-8 animate-spin mb-2 text-amber-500" />
+                      <span className="text-xs">טוען ארגונים ולקוחות...</span>
+                    </div>
+                  ) : allOrganizationsList.length === 0 ? (
+                    <div className="text-center py-12 text-slate-550">לא נמצאו ארגונים רשומים.</div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-right text-xs">
+                        <thead>
+                          <tr className="border-b border-slate-800 text-slate-500 font-bold">
+                            <th className="pb-3 pr-2">שם הארגון וקוד מזהה</th>
+                            <th className="pb-3">דומיינים מאושרים</th>
+                            <th className="pb-3 text-center">משתמשים / משרות / מועמדים</th>
+                            <th className="pb-3 pl-2 text-left font-sans">פעולות ניהול</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800/60">
+                          {allOrganizationsList.map(org => {
+                            const isImpersonated = impersonateOrgId === org.id;
+                            return (
+                              <tr key={org.id} className={`hover:bg-slate-950/40 transition-all ${isImpersonated ? 'bg-amber-950/10' : ''}`}>
+                                <td className="py-4 pr-2 text-right">
+                                  <strong className="text-slate-100 block text-sm">{org.name}</strong>
+                                  <code className="text-[10px] text-slate-450 font-mono block mt-1 select-all">{org.id}</code>
+                                </td>
+                                
+                                <td className="py-4 text-right">
+                                  {org.allowedDomains && org.allowedDomains.length > 0 ? (
+                                    org.allowedDomains.map((d: string, idx: number) => (
+                                      <span key={idx} className="bg-slate-950 border border-slate-800 text-slate-350 px-2 py-0.5 rounded text-[10px] font-mono ml-1.5 inline-block">
+                                        @{d}
+                                      </span>
+                                    ))
+                                  ) : (
+                                    <span className="text-slate-550 italic text-[11px]">ללא (גישת קוד בלבד)</span>
+                                  )}
+                                  
+                                  {org.allowedEmails && org.allowedEmails.length > 0 && (
+                                    <div className="mt-1 text-[10px] text-slate-450">
+                                      מיילים ספציפיים: {org.allowedEmails.join(", ")}
+                                    </div>
+                                  )}
+                                </td>
+
+                                <td className="py-4 text-center font-mono font-bold text-slate-300">
+                                  <span className="text-blue-400" title="משתמשים">{org.userCount || 0}</span>
+                                  <span className="text-slate-500 px-1.5">/</span>
+                                  <span className="text-emerald-400" title="משרות">{org.positionCount || 0}</span>
+                                  <span className="text-slate-500 px-1.5">/</span>
+                                  <span className="text-teal-400" title="מועמדים">{org.candidateCount || 0}</span>
+                                </td>
+
+                                <td className="py-4 pl-2 text-left space-x-reverse space-x-2">
+                                  <button
+                                    onClick={() => {
+                                      if (isImpersonated) {
+                                        localStorage.removeItem('impersonate_org_id');
+                                        setImpersonateOrgId(null);
+                                      } else {
+                                        localStorage.setItem('impersonate_org_id', org.id);
+                                        setImpersonateOrgId(org.id);
+                                        setActiveSection('home');
+                                        alert(`התחברת כעת תחת הארגון "${org.name}". כעת המערכת מציגה משרות, מועמדים והגדרות של לקוח זה.`);
+                                      }
+                                    }}
+                                    className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition shadow-3xs cursor-pointer ${
+                                      isImpersonated
+                                        ? 'bg-amber-600 text-white hover:bg-amber-500'
+                                        : 'bg-slate-800 text-slate-200 hover:bg-slate-700 border border-slate-700/60'
+                                    }`}
+                                  >
+                                    {isImpersonated ? "התנתק מהארגון" : "התחבר כארגון"}
+                                  </button>
+
+                                  <button
+                                    onClick={() => {
+                                      const currentDomains = (org.allowedDomains || []).join(", ");
+                                      const currentEmails = (org.allowedEmails || []).join(", ");
+                                      const newName = prompt("שם ארגון מועדף:", org.name) || org.name;
+                                      const domainsStr = prompt("ערוך דומיינים מאושרים (מופרדים בפסיקים):", currentDomains);
+                                      const emailsStr = prompt("ערוך כתובות מייל מאושרות (מופרדות בפסיקים):", currentEmails);
+
+                                      if (domainsStr === null || emailsStr === null) return;
+
+                                      const allowedDomains = domainsStr.split(",").map(d => d.trim().toLowerCase()).filter(d => d !== "");
+                                      const allowedEmails = emailsStr.split(",").map(e => e.trim().toLowerCase()).filter(e => e !== "");
+
+                                      authFetch(`/api/superadmin/organizations/${org.id}`, {
+                                        method: 'PUT',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ name: newName, allowedDomains, allowedEmails })
+                                      }).then(async res => {
+                                        if (res.ok) {
+                                          alert("ההגדרות עודכנו בהצלחה!");
+                                          const orgs = await authFetch('/api/superadmin/organizations').then(r => r.json());
+                                          setAllOrganizationsList(orgs || []);
+                                        } else {
+                                          alert("שגיאה בעדכון הגדרות הארגון.");
+                                        }
+                                      });
+                                    }}
+                                    className="bg-slate-800/80 text-slate-350 hover:text-white px-2 py-1.5 rounded text-[10px] border border-slate-800 transition cursor-pointer font-sans"
+                                  >
+                                    ערוך חוקים
+                                  </button>
+
+                                  <button
+                                    onClick={() => {
+                                      if (org.id === "default-org") {
+                                        alert("לא ניתן למחוק את ארגון ברירת המחדל.");
+                                        return;
+                                      }
+                                      if (confirm(`זהירות! מחיקת הארגון "${org.name}" תגרור מחיקה מיידית של כל המשתמשים, המועמדים, המשרות ותיקי הגיוס שלו. האם אתה בטוח?`)) {
+                                        authFetch(`/api/superadmin/organizations/${org.id}`, { method: 'DELETE' }).then(async res => {
+                                          if (res.ok) {
+                                            alert("הארגון וכלל נתוניו נמחקו בהצלחה.");
+                                            const orgs = await authFetch('/api/superadmin/organizations').then(r => r.json());
+                                            setAllOrganizationsList(orgs || []);
+                                          } else {
+                                            alert("שגיאה במחיקת הארגון.");
+                                          }
+                                        });
+                                      }
+                                    }}
+                                    className="text-red-400 hover:text-red-300 hover:bg-red-950/20 px-2 py-1.5 rounded transition text-[10px] cursor-pointer font-sans"
+                                  >
+                                    מחק
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
+                {/* Users List Pane (Right Column) */}
+                <div className="lg:col-span-4 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm space-y-4">
+                  <h4 className="text-sm font-bold text-white flex items-center gap-2 border-b border-slate-800 pb-3">
+                    <Users className="w-5 h-5 text-amber-500" />
+                    <span>משתמשי המערכת הרשומים</span>
+                  </h4>
+
+                  {superAdminLoading ? (
+                    <div className="flex justify-center py-6">
+                      <Loader2 className="w-5 h-5 animate-spin text-amber-500" />
+                    </div>
+                  ) : allUsersList.length === 0 ? (
+                    <div className="text-center py-6 text-slate-550 text-xs font-sans">לא נמצאו משתמשים.</div>
+                  ) : (
+                    <div className="space-y-3.5 max-h-[500px] overflow-y-auto pr-1">
+                      {allUsersList.map(user => (
+                        <div key={user.id} className="p-3 bg-slate-950/60 border border-slate-850 rounded-xl space-y-1.5 text-right">
+                          <div className="flex justify-between items-center gap-2">
+                            <strong className="text-xs text-slate-200 truncate max-w-[170px]" title={user.email}>{user.email}</strong>
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded-md font-bold uppercase ${
+                              user.role === 'superadmin' ? 'bg-amber-950 text-amber-400 border border-amber-900' :
+                              user.role === 'admin' ? 'bg-blue-950 text-blue-400 border border-blue-900' :
+                              'bg-slate-900 text-slate-400 border border-slate-800'
+                            }`}>
+                              {user.role}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center text-[10px] text-slate-400">
+                            <span>ארגון: <strong className="text-slate-300 font-bold">{user.organizationName}</strong></span>
+                            <span className="font-mono text-[9px] text-slate-500">{user.createdAt ? user.createdAt.split('T')[0] : ''}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
               </div>
 
             </div>
