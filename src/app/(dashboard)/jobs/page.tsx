@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Plus, Search, MapPin, Clock, Share2 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -42,12 +43,12 @@ export default function JobsPage() {
           <h1 className="text-2xl font-semibold text-neutral-900">משרות</h1>
           <p className="text-neutral-500 mt-0.5">{JOBS.length} משרות סה״כ</p>
         </div>
-        <a href="/jobs/new">
+        <Link href="/jobs/new">
           <Button size="md">
             <Plus className="w-4 h-4" />
             משרה חדשה
           </Button>
-        </a>
+        </Link>
       </div>
 
       {/* Filters */}

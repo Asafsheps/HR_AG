@@ -6,13 +6,11 @@ import {
   Search, MessageSquare, Loader2, ChevronRight,
   Clock, CheckCircle
 } from "lucide-react";
-import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { Avatar } from "@/components/ui/Avatar";
 import { formatDate } from "@/lib/utils";
-import type { Metadata } from "next";
 
-// Fix: metadata can't be exported from client component — move to layout if needed
+// Note: metadata can't be exported from a client component — move to layout if needed
 
 interface Job          { id: string; title: string }
 interface LastMessage  { body: string; direction: string; created_at: string }

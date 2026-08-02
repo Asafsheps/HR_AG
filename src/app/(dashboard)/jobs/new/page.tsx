@@ -312,7 +312,7 @@ export default function NewJobPage() {
               </div>
             ))}
             {questions.length === 0 && (
-              <p className="text-center text-neutral-400 text-sm py-8">לא הוגדרו שאלות. לחץ "הוסף שאלה".</p>
+              <p className="text-center text-neutral-400 text-sm py-8">לא הוגדרו שאלות. לחץ &quot;הוסף שאלה&quot;.</p>
             )}
           </div>
         </Card>
