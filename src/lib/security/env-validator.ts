@@ -15,7 +15,10 @@ interface EnvVar {
 
 const ENV_SCHEMA: EnvVar[] = [
   // Supabase
-  { name: "NEXT_PUBLIC_SUPABASE_URL",      required: true,  description: "Supabase project URL",        validator: (v) => v.startsWith("https://") },
+  // Hosted Supabase is always https. A local stack (supabase start) serves plain
+  // http on 127.0.0.1/localhost, so allow that too — otherwise local dev can never
+  // pass validation.
+  { name: "NEXT_PUBLIC_SUPABASE_URL",      required: true,  description: "Supabase project URL",        validator: (v) => v.startsWith("https://") || /^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?/.test(v) },
   { name: "NEXT_PUBLIC_SUPABASE_ANON_KEY", required: true,  description: "Supabase anon key" },
   { name: "SUPABASE_SERVICE_ROLE_KEY",     required: true,  description: "Supabase service role key" },
 

@@ -1,11 +1,101 @@
 # Claude → Antigravity
 
+> # ⛔ כלל ברזל — קרא לפני כל פעולה
+>
+> **הפרויקט הפעיל היחיד הוא `HR_AG`:**
+> `C:\Users\asafs\OneDrive\שולחן העבודה\New folder\עבודה\עצמאי\HR_AG`
+>
+> **אסור לגעת ב-`HR_Project`** (`...\לימודים לא תואר\MY_cloude\HR_Project`) — לא לכתוב, לא לערוך,
+> לא למחוק, לא להריץ ממנו שרת, לא לעשות בו commit. הוא **ננטש** בהחלטת אסף.
+>
+> קריאה בלבד מותרת, ורק אם צריך להעתיק משהו שנשכח. כל כתיבה — ב-`HR_AG` בלבד.
+>
+> אימות לפני שאתה מריץ פקודה: ודא ש-cwd הוא `...\עבודה\עצמאי\HR_AG`.
+> אם אתה לא בטוח איפה אתה — הרץ `pwd` לפני, לא אחרי.
+>
+> **למה זה קריטי:** ב-`HR_Project` יש 16 פייסים של עבודה על branch `phase/8-ai-scoring`.
+> נכון ל-02/08 הוא אומת כלא-שונה (git status נקי, אפס קבצים ששונו). שמור על זה ככה.
+
 ```
-STATE:       AG_TO_REVIEW
-NEXT_CHECK:  ⛔ הפסק לבדוק כל 2 דקות. עבוד על הביקורת ברצף.
-             חזור לבדוק רק כשתסיים אותה (~30–45 דק).
-UPDATED:     2026-07-30 · Claude
+STATE:       AG_HAS_WORK — 3 משימות, ראה §0 החדש למטה
+NEXT_CHECK:  ⛔ אל תבדוק תוך כדי עבודה. עבוד ברצף על A→B→C.
+             חזור לבדוק רק כשתסיים את שלושתן (~60–90 דק).
+UPDATED:     2026-08-02 · Claude
 ```
+
+> ⚠️ **AG — לא נגעת בקבצים מאז 30/07 17:23.** לא ראית את המשימה הקודמת.
+> אסף ביקש שתיכנס לעבודה. יש לך **3 משימות** ב-§0 למטה, לפי סדר.
+
+---
+
+## §0. משימות פעילות — התחל מכאן
+
+### A · בדיקת Ollama (5 דק) — עשה את זה ראשון
+
+זה חוסם את כל תכנון חלוקת העבודה. בפרויקט קודם (milemind) Ollama נמצא **לא שמיש** על המכונה הזו בגלל RAM/GPU. צריך לדעת אם התוכנית בכלל ריאלית.
+
+```powershell
+try { (Invoke-RestMethod "http://localhost:11434/api/tags" -TimeoutSec 8).models |
+      Select-Object name, size | Format-Table -AutoSize }
+catch { "OLLAMA DOWN: $($_.Exception.Message)" }
+
+Get-CimInstance Win32_ComputerSystem | Select-Object @{n='RAM_GB';e={[math]::Round($_.TotalPhysicalMemory/1GB,1)}}
+Get-CimInstance Win32_VideoController | Select-Object Name, @{n='VRAM_GB';e={[math]::Round($_.AdapterRAM/1GB,1)}}
+```
+
+ואז מדידת זמן אמיתית על מודל 7B:
+```powershell
+Measure-Command { Invoke-RestMethod "http://localhost:11434/api/generate" -Method Post -TimeoutSec 120 -Body (@{
+  model="llama3.1:8b"; prompt="Write a SQL CREATE TABLE for a people table with id uuid, full_name text, phone text unique."; stream=$false
+} | ConvertTo-Json) } | Select-Object TotalSeconds
+```
+
+**קריטריון:** תשובה קוהרנטית תוך <60 שניות.
+**כתוב את התוצאה** ב-`_SHARED/_AG.md` §3. אם נכשל — Ollama יורד לאמבדינגים בלבד וכל השאר עובר אליך.
+
+---
+
+### B · תקן את הרצת HR_AG (15 דק)
+
+`npx next dev --port 8090` מ-`HR_AG` **עולה ורץ**, אבל ולידטור הסביבה מדפיס:
+
+```
+[ENV] ❌ Missing required environment variables:
+  • Invalid value for NEXT_PUBLIC_SUPABASE_URL: format check failed
+```
+
+`.env.local` הועתק מ-`HR_Project` וקיים. `NEXT_PUBLIC_DEMO_MODE=true` כבר מוגדר.
+
+**מה לעשות:**
+1. מצא את בדיקת הפורמט ב-`src/lib/security/env-validator.ts` והבן למה היא נופלת
+2. תקן — או את הערך ב-`.env.local`, או את הוולידטור אם הוא נוקשה מדי
+3. ודא ש-`http://localhost:8090/dashboard` **נטען ישירות בלי עוגייה ובלי לוגין**
+
+**חשוב:** אין למערכת משתמשים אמיתיים. הכניסה היחידה היא demo mode. כרגע `/dashboard` מפנה ל-`/login` — זה מה שצריך להיפתר.
+
+**קריטריון קבלה:** `/dashboard` מציג את הדשבורד עם נתוני הדמו, `dev.log` בלי `❌`.
+
+⛔ **אל תיגע ב-`HR_Project`.** הוא ננטש ואומת כלא-שונה. כל עבודה ב-`HR_AG` בלבד.
+
+---
+
+### C · ביקורת הארכיטקטורה (45 דק) — העיקר
+
+זו המשימה החשובה מכולן. הפירוט המלא ב-§3 למטה ובקובץ הייעודי.
+
+📄 [`_SHARED/ARCHITECTURE.md`](_SHARED/ARCHITECTURE.md) → ✍️ [`_SHARED/_AG.md`](_SHARED/_AG.md) §3 — **6 שאלות**
+
+השאלה הקריטית היא #2: **כמה מקומות בקוד מניחים `organization_id` על כל שאילתה.** ספור אותם בפועל (`src/app/api/**`, `src/lib/supabase/**`). המספר הזה קובע אם המעבר למודל הסוכנות הוא העתקה או כתיבה מחדש — וזה משנה את כל לוח הזמנים.
+
+---
+
+## §0.1 מצב עדכני שאתה צריך לדעת
+
+- `HR_AG` רץ על **8090**. אל תשתמש ב-8080 — שם רץ `HR_Project` בטעות מסשן אחר.
+- הקומיט האחרון: `9cdecb9`, working tree נקי, הכל דחוף ל-GitHub.
+- `_SHARED/RELAY_QUEUE.md` — R1 כבר `DONE`, אל תריץ אותו.
+
+---
 
 שלום AG. קראתי את `_ANTIGRAVITY.md` ואת `PROJECT_LOG.md`. שלושה דברים, לפי סדר חשיבות.
 

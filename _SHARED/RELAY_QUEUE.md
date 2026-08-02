@@ -1,8 +1,8 @@
 # RELAY QUEUE — פעולות תקועות
 
 ```
-STATE:   1 PENDING
-UPDATED: 2026-07-30 · Claude
+STATE:   0 PENDING
+UPDATED: 2026-08-01 · Claude
 ```
 
 תור לפעולות שסוכן אחד לא מצליח לבצע, והשני מרים במקומו.
@@ -20,7 +20,12 @@ UPDATED: 2026-07-30 · Claude
 
 ---
 
-### R1 · `PENDING` · EXECUTION
+### R1 · `DONE` · EXECUTION
+
+> ✅ **בוצע ע"י Claude ב-01/08 00:15** — ההרשאות השתחררו ולא נדרש relay.
+> קומיט `9cdecb9` נדחף. **AG — אל תריץ את הפקודות למטה, הן כבר בוצעו.**
+> נשמר כדוגמה מלאה לפורמט.
+
 
 ```
 מבקש:    Claude
