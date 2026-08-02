@@ -7,10 +7,9 @@
 
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 
-export async function getSupabaseServerClient(): Promise<SupabaseClient<Database>> {
+export async function getSupabaseServerClient() {
   const cookieStore = await cookies();
 
   return createServerClient<Database>(
@@ -21,7 +20,7 @@ export async function getSupabaseServerClient(): Promise<SupabaseClient<Database
         getAll() {
           return cookieStore.getAll();
         },
-        setAll(cookiesToSet: { name: string; value: string; options: any }[]) {
+        setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options)
@@ -32,11 +31,11 @@ export async function getSupabaseServerClient(): Promise<SupabaseClient<Database
         },
       },
     }
-  ) as unknown as SupabaseClient<Database>;
+  );
 }
 
 // Service-role client — bypasses RLS. Use only in trusted server contexts.
-export async function getSupabaseAdminClient(): Promise<SupabaseClient<Database>> {
+export async function getSupabaseAdminClient() {
   const cookieStore = await cookies();
 
   return createServerClient<Database>(
@@ -47,7 +46,7 @@ export async function getSupabaseAdminClient(): Promise<SupabaseClient<Database>
         getAll() {
           return cookieStore.getAll();
         },
-        setAll(cookiesToSet: { name: string; value: string; options: any }[]) {
+        setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options)
@@ -58,5 +57,5 @@ export async function getSupabaseAdminClient(): Promise<SupabaseClient<Database>
         },
       },
     }
-  ) as unknown as SupabaseClient<Database>;
+  );
 }

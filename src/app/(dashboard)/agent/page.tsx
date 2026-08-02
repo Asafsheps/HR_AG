@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Bot, MessageSquare, Settings2, ChevronRight, Circle,
-         Pause, Play, UserCheck, AlertCircle, Clock, Star,
+         AlertCircle, Clock, Star,
          Plus, Trash2, GripVertical, Save, ToggleLeft, ToggleRight,
          TrendingUp, Users, Zap } from "lucide-react";
 
@@ -132,7 +132,6 @@ function ScoreBadge({ score }: { score: number }) {
 }
 
 function ThreadMessage({ item }: { item: ThreadItem }) {
-  const isInbound  = item.direction === "inbound";
   const isOutbound = item.direction === "outbound";
   const isAction   = item.type === "agent_action";
 

@@ -48,9 +48,8 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (profile) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase as any).from("ai_usage_logs").insert({
-      organization_id: (profile as any).organization_id,
+    await supabase.from("ai_usage_logs").insert({
+      organization_id: profile.organization_id,
       feature:         "jd_generator",
       prompt_version:  "v1",
       provider:        response.provider,

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Briefcase, Users, MessageSquare, TrendingUp } from "lucide-react";
 import { StatCard } from "@/components/ui/StatCard";
 import { Card } from "@/components/ui/Card";
@@ -82,9 +83,9 @@ export default function DashboardPage() {
           <Card padding="none">
             <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-100">
               <h2 className="font-semibold text-neutral-900">מועמדים אחרונים</h2>
-              <a href="/candidates" className="text-sm text-primary-600 hover:text-primary-700">
+              <Link href="/candidates" className="text-sm text-primary-600 hover:text-primary-700">
                 הצג הכל
-              </a>
+              </Link>
             </div>
             <div className="divide-y divide-neutral-100">
               {RECENT_CANDIDATES.map((c) => {
@@ -118,9 +119,9 @@ export default function DashboardPage() {
           <Card padding="none">
             <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-100">
               <h2 className="font-semibold text-neutral-900">משרות פעילות</h2>
-              <a href="/jobs" className="text-sm text-primary-600 hover:text-primary-700">
+              <Link href="/jobs" className="text-sm text-primary-600 hover:text-primary-700">
                 הצג הכל
-              </a>
+              </Link>
             </div>
             <div className="divide-y divide-neutral-100">
               {ACTIVE_JOBS.map((j) => (

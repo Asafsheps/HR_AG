@@ -43,12 +43,11 @@ export async function POST(request: NextRequest) {
     .eq("id", user.id)
     .single();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: candidate } = await supabase
     .from("candidates")
     .select("id, organization_id, full_name")
     .eq("id", candidate_id)
-    .single() as { data: any };
+    .single();
 
   if (!candidate) {
     return NextResponse.json(apiError("מועמד לא נמצא"), { status: 404 });

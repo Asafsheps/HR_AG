@@ -15,12 +15,11 @@ export async function POST(_req: NextRequest, { params }: Params) {
   if (!user) return NextResponse.json(apiError("Unauthorized"), { status: 401 });
 
   // Verify assignment is submitted
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: assignment } = await supabase
     .from("assignments")
     .select("id, status")
     .eq("id", id)
-    .single() as { data: any };
+    .single();
 
   if (!assignment) return NextResponse.json(apiError("מטלה לא נמצאה"), { status: 404 });
   if (assignment.status !== "submitted") {

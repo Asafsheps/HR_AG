@@ -10,6 +10,9 @@ import { createJobSchema } from "@/lib/validators/job";
 import { slugify, apiSuccess, apiError } from "@/lib/utils";
 import type { DbJobStatus } from "@/types/database";
 
+// Mirrors the job_status enum in supabase/migrations/..._extensions_and_enums.sql
+const JOB_STATUSES: readonly DbJobStatus[] = ["draft", "active", "paused", "closed", "archived"];
+
 // GET /api/jobs
 export async function GET(request: NextRequest) {
   const supabase = await getSupabaseServerClient();
@@ -17,10 +20,18 @@ export async function GET(request: NextRequest) {
   if (!user) return NextResponse.json(apiError("Unauthorized"), { status: 401 });
 
   const { searchParams } = new URL(request.url);
-  const status = searchParams.get("status");
+  const rawStatus = searchParams.get("status");
   const page   = parseInt(searchParams.get("page") ?? "1");
   const limit  = parseInt(searchParams.get("limit") ?? "20");
   const offset = (page - 1) * limit;
+
+  // `status` is untrusted URL input. Narrow it by checking membership in the
+  // enum rather than asserting the type — an unrecognised value is a bad
+  // request, not something to hand to the database.
+  const status = JOB_STATUSES.find(s => s === rawStatus);
+  if (rawStatus && !status) {
+    return NextResponse.json(apiError(`Invalid status: ${rawStatus}`), { status: 400 });
+  }
 
   let query = supabase
     .from("jobs")
@@ -28,7 +39,7 @@ export async function GET(request: NextRequest) {
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
 
-  if (status) query = query.eq("status", status as DbJobStatus);
+  if (status) query = query.eq("status", status);
 
   const { data, error, count } = await query;
   if (error) return NextResponse.json(apiError(error.message), { status: 500 });

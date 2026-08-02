@@ -17,6 +17,8 @@
 //  11. Return reply text (caller sends via WhatsApp provider)
 // ==================================================
 
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/types/database";
 import { getSupabaseAdminClient } from "@/lib/supabase/server";
 import { callAI } from "@/lib/ai/providers";
 import { fillPrompt } from "@/lib/ai/prompts/v1";
@@ -92,9 +94,8 @@ export async function processInboundMessage(params: {
 }
 
 // ── Core agent logic ──────────────────────────────────────────────────────────
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function runAgent(
-  supabase: any,
+  supabase: SupabaseClient<Database>,
   candidate: {
     id: string; full_name: string; organization_id: string;
     job_id: string; is_ai_active: boolean; status: string;
