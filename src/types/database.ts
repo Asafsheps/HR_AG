@@ -32,7 +32,7 @@ export type DbAiRecommendation = "proceed" | "borderline" | "reject";
 // --------------------------------------------------
 // Database interface
 // --------------------------------------------------
-export interface Database {
+interface RawDatabase {
   public: {
     Tables: {
 
@@ -429,3 +429,16 @@ export interface Database {
     };
   };
 }
+
+type AddRelationships<T> = {
+  [K in keyof T]: T[K] & { Relationships: never[] }
+};
+
+export type Database = {
+  public: {
+    Tables: AddRelationships<RawDatabase["public"]["Tables"]>;
+    Views: RawDatabase["public"]["Views"];
+    Functions: RawDatabase["public"]["Functions"];
+    Enums: RawDatabase["public"]["Enums"];
+  };
+};

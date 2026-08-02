@@ -54,9 +54,9 @@ export function validateEnv(): EnvValidationResult {
   const warnings: string[] = [];
 
   for (const schema of ENV_SCHEMA) {
-    const value = process.env[schema.name];
+    const rawValue = process.env[schema.name];
 
-    if (!value || value.trim() === "") {
+    if (!rawValue || rawValue.trim() === "") {
       if (schema.required) {
         errors.push(`Missing required env var: ${schema.name} (${schema.description})`);
       } else {
@@ -64,6 +64,8 @@ export function validateEnv(): EnvValidationResult {
       }
       continue;
     }
+
+    const value = rawValue.trim();
 
     if (schema.validator && !schema.validator(value)) {
       const msg = `Invalid value for ${schema.name}: format check failed`;

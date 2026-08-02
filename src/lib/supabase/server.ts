@@ -7,9 +7,10 @@
 
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 
-export async function getSupabaseServerClient() {
+export async function getSupabaseServerClient(): Promise<SupabaseClient<Database>> {
   const cookieStore = await cookies();
 
   return createServerClient<Database>(
@@ -20,7 +21,7 @@ export async function getSupabaseServerClient() {
         getAll() {
           return cookieStore.getAll();
         },
-        setAll(cookiesToSet) {
+        setAll(cookiesToSet: { name: string; value: string; options: any }[]) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options)
@@ -31,11 +32,11 @@ export async function getSupabaseServerClient() {
         },
       },
     }
-  );
+  ) as unknown as SupabaseClient<Database>;
 }
 
 // Service-role client — bypasses RLS. Use only in trusted server contexts.
-export async function getSupabaseAdminClient() {
+export async function getSupabaseAdminClient(): Promise<SupabaseClient<Database>> {
   const cookieStore = await cookies();
 
   return createServerClient<Database>(
@@ -46,7 +47,7 @@ export async function getSupabaseAdminClient() {
         getAll() {
           return cookieStore.getAll();
         },
-        setAll(cookiesToSet) {
+        setAll(cookiesToSet: { name: string; value: string; options: any }[]) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options)
@@ -57,5 +58,5 @@ export async function getSupabaseAdminClient() {
         },
       },
     }
-  );
+  ) as unknown as SupabaseClient<Database>;
 }

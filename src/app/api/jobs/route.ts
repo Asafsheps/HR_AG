@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { createJobSchema } from "@/lib/validators/job";
 import { slugify, apiSuccess, apiError } from "@/lib/utils";
+import type { DbJobStatus } from "@/types/database";
 
 // GET /api/jobs
 export async function GET(request: NextRequest) {
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
 
-  if (status) query = query.eq("status", status);
+  if (status) query = query.eq("status", status as DbJobStatus);
 
   const { data, error, count } = await query;
   if (error) return NextResponse.json(apiError(error.message), { status: 500 });

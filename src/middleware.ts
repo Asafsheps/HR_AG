@@ -50,7 +50,7 @@ export async function middleware(request: NextRequest) {
 
   // ── 0. Demo mode bypass ────────────────────────────────────────────────────
   const isDemoMode =
-    process.env.NEXT_PUBLIC_DEMO_MODE === "true" ||
+    process.env.NEXT_PUBLIC_DEMO_MODE?.trim() === "true" ||
     request.cookies.has("hr-demo");
 
   if (isDemoMode) {
