@@ -2,7 +2,7 @@
 // Application Constants
 // ==================================================
 
-export const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME ?? "HR Project";
+export const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME ?? "HR AG";
 export const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
 // Candidate pipeline stages in display order

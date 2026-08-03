@@ -36,7 +36,7 @@ export default function LoginPage() {
           <div className="inline-flex items-center justify-center w-12 h-12 bg-primary-600 rounded-xl mb-4">
             <span className="text-white font-bold text-xl">H</span>
           </div>
-          <h1 className="text-2xl font-semibold text-neutral-900">HR Project</h1>
+          <h1 className="text-2xl font-semibold text-neutral-900">HR AG</h1>
           <p className="text-sm text-neutral-500 mt-1">פלטפורמת גיוס מבוססת AI</p>
         </div>
 

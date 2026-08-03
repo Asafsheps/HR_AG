@@ -173,7 +173,7 @@ export default function ApplyPage({ params }: { params: Promise<{ slug: string }
               H
             </div>
             <div>
-              <p className="text-primary-200 text-sm font-medium mb-1">HR Project</p>
+              <p className="text-primary-200 text-sm font-medium mb-1">HR AG</p>
               <h1 className="text-2xl font-bold mb-3">{job.title}</h1>
               <div className="flex flex-wrap items-center gap-3 text-sm">
                 <span className="flex items-center gap-1.5 bg-white/15 px-3 py-1 rounded-full">

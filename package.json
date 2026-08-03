@@ -1,8 +1,8 @@
 {
-  "name": "hr-project",
+  "name": "hr-ag",
   "version": "0.1.0",
   "private": true,
-  "description": "AI-powered Recruitment SaaS platform — ATS + CRM + WhatsApp AI recruiter",
+  "description": "HR AG — AI placement agency: candidate pool, AI matching, success-fee placements",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
