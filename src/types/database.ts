@@ -28,6 +28,10 @@ export type DbMessageDirection = "inbound" | "outbound";
 export type DbMessageSender    = "candidate" | "ai" | "recruiter";
 export type DbAssignmentStatus = "pending" | "sent" | "submitted" | "evaluated" | "expired";
 export type DbAiRecommendation = "proceed" | "borderline" | "reject";
+// Migration 014
+export type DbAgentTone           = "friendly" | "professional" | "strict" | "concise";
+export type DbConversationChannel = "web" | "whatsapp";
+export type DbGender              = "male" | "female" | "other" | "undisclosed";
 
 // --------------------------------------------------
 // Database interface
@@ -112,6 +116,7 @@ interface RawDatabase {
           screening_questions:      Json;
           rejection_rules:          Json;
           ai_instructions:          string | null;
+          agent_profile_id:         string | null;   // migration 014
           created_at:               string;
           updated_at:               string;
         };
@@ -132,6 +137,7 @@ interface RawDatabase {
           screening_questions?:      Json;
           rejection_rules?:          Json;
           ai_instructions?:          string | null;
+          agent_profile_id?:         string | null;   // migration 014
           created_at?:               string;
           updated_at?:               string;
         };
@@ -149,6 +155,7 @@ interface RawDatabase {
           screening_questions?:      Json;
           rejection_rules?:          Json;
           ai_instructions?:          string | null;
+          agent_profile_id?:         string | null;   // migration 014
           updated_at?:               string;
         };
       };
@@ -169,6 +176,8 @@ interface RawDatabase {
           ai_summary:         string | null;
           recruiter_notes:    string | null;
           is_ai_active:       boolean;
+          birth_year:         number | null;   // migration 014
+          gender:             DbGender | null; // migration 014
           linkedin_url:       string | null;
           portfolio_url:      string | null;
           cover_letter:       string | null;
@@ -325,6 +334,130 @@ interface RawDatabase {
           submission_metadata?: Json;
           sent_at?:             string | null;
           submitted_at?:        string | null;
+        };
+      };
+
+      // ── Migration 014 ────────────────────────────────────────────────
+      agent_profiles: {
+        Row: {
+          id:                  string;
+          organization_id:     string;
+          name:                string;
+          persona_name:        string;
+          objective:           string;
+          tone:                DbAgentTone;
+          guidelines:          string;
+          language:            string;
+          max_questions:       number;
+          escalate_after:      number | null;
+          never_discuss:       string[];
+          stages:              Json;
+          scoring_criteria:    Json;
+          auto_score:          boolean;
+          auto_escalate_score: number | null;
+          reject_score:        number | null;
+          is_default:          boolean;
+          created_at:          string;
+          updated_at:          string;
+        };
+        Insert: {
+          id?:                  string;
+          organization_id:      string;
+          name:                 string;
+          persona_name?:        string;
+          objective?:           string;
+          tone?:                DbAgentTone;
+          guidelines?:          string;
+          language?:            string;
+          max_questions?:       number;
+          escalate_after?:      number | null;
+          never_discuss?:       string[];
+          stages?:              Json;
+          scoring_criteria?:    Json;
+          auto_score?:          boolean;
+          auto_escalate_score?: number | null;
+          reject_score?:        number | null;
+          is_default?:          boolean;
+        };
+        Update: {
+          name?:                string;
+          persona_name?:        string;
+          objective?:           string;
+          tone?:                DbAgentTone;
+          guidelines?:          string;
+          language?:            string;
+          max_questions?:       number;
+          escalate_after?:      number | null;
+          never_discuss?:       string[];
+          stages?:              Json;
+          scoring_criteria?:    Json;
+          auto_score?:          boolean;
+          auto_escalate_score?: number | null;
+          reject_score?:        number | null;
+          is_default?:          boolean;
+        };
+      };
+
+      campaigns: {
+        Row: {
+          id:              string;
+          organization_id: string;
+          job_id:          string;
+          code:            string;
+          channel:         string;
+          ad_copy:         string;
+          landing_url:     string;
+          wa_link:         string | null;
+          clicks:          number;
+          conversations:   number;
+          qualified:       number;
+          is_active:       boolean;
+          created_at:      string;
+        };
+        Insert: {
+          id?:             string;
+          organization_id: string;
+          job_id:          string;
+          code:            string;
+          channel:         string;
+          ad_copy?:        string;
+          landing_url:     string;
+          wa_link?:        string | null;
+          clicks?:         number;
+          conversations?:  number;
+          qualified?:      number;
+          is_active?:      boolean;
+        };
+        Update: {
+          channel?:       string;
+          ad_copy?:       string;
+          landing_url?:   string;
+          wa_link?:       string | null;
+          clicks?:        number;
+          conversations?: number;
+          qualified?:     number;
+          is_active?:     boolean;
+        };
+      };
+
+      channel_settings: {
+        Row: {
+          organization_id:     string;
+          whatsapp_number:     string | null;
+          whatsapp_provider:   string | null;
+          is_whatsapp_enabled: boolean;
+          updated_at:          string;
+        };
+        Insert: {
+          organization_id:      string;
+          whatsapp_number?:     string | null;
+          whatsapp_provider?:   string | null;
+          is_whatsapp_enabled?: boolean;
+        };
+        Update: {
+          whatsapp_number?:     string | null;
+          whatsapp_provider?:   string | null;
+          is_whatsapp_enabled?: boolean;
         };
       };
 

@@ -265,9 +265,114 @@ create table candidate_scores (
 
 ---
 
-## החלטות שצריך מאסף
+## ✅ החלטות אסף — 03/08/2026
 
-1. **מקור מידע לאיתור חברות** — ידני+העשרה (מומלץ), או חיפוש רשת בתשלום?
-2. **מספר וואטסאפ** — יש מספר עסקי? Twilio או Meta? זה חוסם את מודול 3.
-3. **פרופיל סוכן אחד או כמה?** — פרופיל לכל סוג משרה, או אחד גלובלי?
-4. **גיל ומגדר** — מאשר לוותר עליהם כפילטרים, לפי הסעיף המשפטי למעלה?
+| # | נושא | ההחלטה |
+|---|---|---|
+| 1 | איתור חברות | ידני + העשרה. **בלי** חיפוש רשת בתשלום בשלב זה |
+| 2 | ערוץ השיחה | **צ'אט פנימי באתר** — לא וואטסאפ. וואטסאפ נשאר מוכן, מופעל בהזנת מספר |
+| 3 | פרופיל סוכן | **פר-משרה**, לא גלובלי |
+| 4 | גיל ומגדר | **נשארים** כשדות סינון — החלטת אסף אחרי שהסיכון הוצג |
+
+### על החלטה 4
+הסיכון המשפטי מוצג במלואו בסעיף למעלה ואינו משתנה. אסף אישר במפורש אחרי שקרא אותו — זו החלטה עסקית שלו ובאחריותו. השדות נבנים.
+
+**מה שכן נבנה לצד זה, כי הוא חסר עלות ומגן עליו:**
+`audit_logs` כבר קיים במערכת. כל סינון שמשתמש ב-`age` או ב-`gender` נרשם בו. אם אי פעם תישאל שאלה, יש תיעוד מי סינן, מתי ולפי מה — במקום כלום.
+
+### על החלטה 2 — למה זו בחירה טובה
+צ'אט פנימי חוסך אישור WhatsApp Business API (שבועות), עלות ספק, ותלות בצד שלישי. וחשוב מכך — **הכל קורה בתוך המערכת**, כך שקורות החיים, השיחה והציון נשמרים ביחד בלי webhook באמצע.
+
+הקוד הקיים כבר בנוי לזה: `src/lib/whatsapp/providers/` הוא **הפשטת ספקים**. מוסיפים ערוץ `web` לצד `meta` ו-`twilio`, והסוכן לא יודע מה ההבדל.
+
+---
+
+## מודול 3 — גרסה מתוקנת: דף נחיתה + צ'אט פנימי
+
+```
+  ① AI כותב מודעה
+        │
+  ② לינק לדף נחיתה:  /j/A7X
+        │
+        ▼
+  ③ דף נחיתה — פומבי, בלי הרשמה
+     • תיאור המשרה
+     • העלאת קורות חיים
+     • כפתור "בוא נדבר"
+        │
+        ▼
+  ④ צ'אט עם הסוכן — באתר, לא בוואטסאפ
+     agent_profiles של המשרה + השאלות שלה
+        │
+        ▼
+  ⑤ ציון רב-ממדי → טבלה מסוננת
+```
+
+### שינויי סכמה מול הגרסה הקודמת
+
+```sql
+-- ערוץ מפורש. web עכשיו, whatsapp כשיוחלט.
+create type conversation_channel as enum ('web', 'whatsapp');
+
+alter table conversation_contexts
+  add column channel conversation_channel not null default 'web',
+  add column session_token text unique;   -- מזהה אנונימי לפני שיש person
+
+-- קמפיין — עכשיו מצביע לדף נחיתה, לא ל-wa.me
+create table campaigns (
+  id             uuid primary key default uuid_generate_v4(),
+  client_job_id  uuid not null references client_jobs on delete cascade,
+
+  code           text not null unique,      -- "A7X" — נכנס ל-URL
+  channel        text not null,             -- איפה פורסם: facebook/linkedin/...
+  ad_copy        text not null,
+
+  landing_url    text not null,             -- /j/A7X
+  wa_link        text,                      -- nullable — רק אם וואטסאפ מופעל
+
+  clicks         integer not null default 0,
+  conversations  integer not null default 0,
+  qualified      integer not null default 0,
+
+  is_active      boolean not null default true,
+  created_at     timestamptz not null default now()
+);
+
+-- הגדרות ערוץ. וואטסאפ מופעל בהזנת מספר — בלי שינוי קוד.
+create table channel_settings (
+  id             uuid primary key default uuid_generate_v4(),
+  whatsapp_number text,                     -- null = כבוי
+  whatsapp_provider text,                   -- 'twilio' | 'meta'
+  is_whatsapp_enabled boolean not null default false,
+  updated_at     timestamptz not null default now()
+);
+```
+
+### שדות דמוגרפיים (החלטה 4)
+
+```sql
+alter table people
+  add column birth_year  smallint,     -- שנה, לא תאריך מלא
+  add column gender      text;         -- 'male'|'female'|'other'|'undisclosed'
+```
+
+`birth_year` ולא תאריך לידה מלא — מספיק לחישוב גיל, וחושף פחות.
+`undisclosed` הוא ערך תקף: המועמד לא חייב לענות, והסוכן לא ילחץ.
+
+---
+
+## סדר ביצוע מעודכן
+
+| שלב | מה | מבצע | הערכה |
+|---|---|---|---|
+| 1 | `agent_profiles` + חיבור ל-API (מחליף את ה-501) | Ollama | 1.5 שע׳ |
+| 2 | סימולטור צ'אט לבדיקת הסוכן | AG | 3 שע׳ |
+| 3 | `campaigns` + `channel_settings` + מחולל קוד | Ollama | 2 שע׳ |
+| 4 | **דף נחיתה `/j/[code]` + העלאת CV** | AG | 4 שע׳ |
+| 5 | **צ'אט פנימי + הפשטת ערוץ** | **Claude** | 4 שע׳ |
+| 6 | `candidate_scores` + טבלה מסוננת | Ollama → AG | 4 שע׳ |
+| 7 | `client_leads` + חקר והכשרה | AG | 4 שע׳ |
+| 8 | `outreach_drafts` + אישור ידני | **Claude** | 3 שע׳ |
+
+שלב 5 אצלי — הוא הופך את הסוכן לאגנוסטי לערוץ, וטעות שם שוברת גם את וואטסאפ העתידי.
+שלב 8 אצלי — שליחת מידע החוצה.
