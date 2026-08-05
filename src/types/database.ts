@@ -549,6 +549,12 @@ interface RawDatabase {
         Args:    Record<string, never>;
         Returns: DbUserRole;
       };
+      // Migration 014. Security definer, so the public landing page can
+      // bump a counter without holding write access to campaigns.
+      increment_campaign_metric: {
+        Args:    { p_code: string; p_metric: "clicks" | "conversations" | "qualified" };
+        Returns: void;
+      };
     };
     Enums: {
       user_role:          DbUserRole;

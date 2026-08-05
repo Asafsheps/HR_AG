@@ -126,6 +126,33 @@ create index campaigns_job_idx    on campaigns (job_id);
 create index campaigns_active_idx on campaigns (organization_id, is_active);
 
 
+-- Counter bumps come from the public landing page, which runs as `anon`
+-- and must not hold write access to the table. A security-definer function
+-- keeps the write server-side and atomic, and accepts only the three
+-- counter names so it cannot be used to modify anything else.
+create or replace function increment_campaign_metric(p_code text, p_metric text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if p_metric not in ('clicks', 'conversations', 'qualified') then
+    raise exception 'invalid metric: %', p_metric;
+  end if;
+
+  update campaigns
+     set clicks        = clicks        + (p_metric = 'clicks')::int,
+         conversations = conversations + (p_metric = 'conversations')::int,
+         qualified     = qualified     + (p_metric = 'qualified')::int
+   where code = p_code
+     and is_active;
+end;
+$$;
+
+grant execute on function increment_campaign_metric(text, text) to anon, authenticated;
+
+
 -- --------------------------------------------------
 -- CHANNEL SETTINGS
 -- --------------------------------------------------
