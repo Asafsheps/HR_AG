@@ -32,6 +32,9 @@ export type DbAiRecommendation = "proceed" | "borderline" | "reject";
 export type DbAgentTone           = "friendly" | "professional" | "strict" | "concise";
 export type DbConversationChannel = "web" | "whatsapp";
 export type DbGender              = "male" | "female" | "other" | "undisclosed";
+// Migration 015
+export type DbSubmissionMethod = "email" | "web_form" | "portal" | "manual";
+export type DbClientJobStatus  = "open" | "paused" | "filled" | "expired";
 
 // --------------------------------------------------
 // Database interface
@@ -337,6 +340,130 @@ interface RawDatabase {
         };
       };
 
+      // ── Migration 015 ────────────────────────────────────────────────
+      client_companies: {
+        Row: {
+          id:                 string;
+          organization_id:    string;
+          name:               string;
+          slug:               string;
+          website:            string | null;
+          careers_url:        string | null;
+          submission_method:  DbSubmissionMethod;
+          submission_config:  Json;
+          bonus_amount_ils:   number | null;
+          bonus_delay_months: number | null;
+          bonus_notes:        string | null;
+          status:             string;
+          contact_name:       string | null;
+          contact_email:      string | null;
+          notes:              string | null;
+          created_at:         string;
+          updated_at:         string;
+        };
+        Insert: {
+          id?:                 string;
+          organization_id:     string;
+          name:                string;
+          slug:                string;
+          website?:            string | null;
+          careers_url?:        string | null;
+          submission_method?:  DbSubmissionMethod;
+          submission_config?:  Json;
+          bonus_amount_ils?:   number | null;
+          bonus_delay_months?: number | null;
+          bonus_notes?:        string | null;
+          status?:             string;
+          contact_name?:       string | null;
+          contact_email?:      string | null;
+          notes?:              string | null;
+        };
+        Update: {
+          name?:               string;
+          slug?:               string;
+          website?:            string | null;
+          careers_url?:        string | null;
+          submission_method?:  DbSubmissionMethod;
+          submission_config?:  Json;
+          bonus_amount_ils?:   number | null;
+          bonus_delay_months?: number | null;
+          bonus_notes?:        string | null;
+          status?:             string;
+          contact_name?:       string | null;
+          contact_email?:      string | null;
+          notes?:              string | null;
+        };
+      };
+
+      client_jobs: {
+        Row: {
+          id:                     string;
+          organization_id:        string;
+          client_company_id:      string;
+          agent_profile_id:       string | null;
+          external_ref:           string | null;
+          source_url:             string | null;
+          title:                  string;
+          location:               string | null;
+          employment_type:        string | null;
+          description:            string;
+          core_skills:            string[];
+          nice_to_have:           string[];
+          min_years:              number | null;
+          business_priority:      string | null;
+          candidate_expectations: string | null;
+          screening_notes:        string | null;
+          extracted_at:           string | null;
+          extraction_model:       string | null;
+          is_reviewed:            boolean;
+          salary_range:           Json | null;
+          status:                 DbClientJobStatus;
+          created_at:             string;
+          updated_at:             string;
+        };
+        Insert: {
+          id?:                     string;
+          organization_id:         string;
+          client_company_id:       string;
+          agent_profile_id?:       string | null;
+          external_ref?:           string | null;
+          source_url?:             string | null;
+          title:                   string;
+          location?:               string | null;
+          employment_type?:        string | null;
+          description?:            string;
+          core_skills?:            string[];
+          nice_to_have?:           string[];
+          min_years?:              number | null;
+          business_priority?:      string | null;
+          candidate_expectations?: string | null;
+          screening_notes?:        string | null;
+          extracted_at?:           string | null;
+          extraction_model?:       string | null;
+          is_reviewed?:            boolean;
+          salary_range?:           Json | null;
+          status?:                 DbClientJobStatus;
+        };
+        Update: {
+          agent_profile_id?:       string | null;
+          title?:                  string;
+          location?:               string | null;
+          employment_type?:        string | null;
+          description?:            string;
+          core_skills?:            string[];
+          nice_to_have?:           string[];
+          min_years?:              number | null;
+          business_priority?:      string | null;
+          candidate_expectations?: string | null;
+          screening_notes?:        string | null;
+          extracted_at?:           string | null;
+          extraction_model?:       string | null;
+          is_reviewed?:            boolean;
+          salary_range?:           Json | null;
+          status?:                 DbClientJobStatus;
+        };
+      };
+
       // ── Migration 014 ────────────────────────────────────────────────
       agent_profiles: {
         Row: {
@@ -402,7 +529,9 @@ interface RawDatabase {
         Row: {
           id:              string;
           organization_id: string;
-          job_id:          string;
+          // Exactly one of job_id / client_job_id is set (migration 015).
+          job_id:          string | null;
+          client_job_id:   string | null;
           code:            string;
           channel:         string;
           ad_copy:         string;
@@ -417,7 +546,8 @@ interface RawDatabase {
         Insert: {
           id?:             string;
           organization_id: string;
-          job_id:          string;
+          job_id?:         string | null;
+          client_job_id?:  string | null;
           code:            string;
           channel:         string;
           ad_copy?:        string;
