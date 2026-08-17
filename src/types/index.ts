@@ -27,7 +27,7 @@ export type CandidateStatus =
 
 export type WhatsAppProvider = "twilio" | "meta";
 
-export type AIProvider = "anthropic" | "openai" | "openrouter";
+export type AIProvider = "anthropic" | "openai" | "gemini" | "ollama" | "openrouter";
 
 export type MessageDirection = "inbound" | "outbound";
 
