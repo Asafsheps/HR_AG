@@ -16,8 +16,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html lang="he" dir="rtl">
+      {/* suppressHydrationWarning: browser extensions (the data-gptw
+          attribute in Asaf's Brave) mutate <body> before React hydrates,
+          which is indistinguishable from a real mismatch to React. */}
+      <body suppressHydrationWarning>{children}</body>
     </html>
   );
 }
