@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     .select(`
       id, full_name, phone, whatsapp_number, status, ai_score, updated_at,
       job:jobs ( id, title ),
-      last_message:whatsapp_messages (
+      last_message:messages (
         body, direction, created_at
       )
     `)

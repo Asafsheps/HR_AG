@@ -40,7 +40,7 @@ export async function GET(
 
   // Full message thread
   const { data: messages, error } = await db
-    .from("whatsapp_messages")
+    .from("messages")
     .select("id, direction, sender, body, provider_message_id, created_at")
     .eq("candidate_id", candidateId)
     .order("created_at", { ascending: true });

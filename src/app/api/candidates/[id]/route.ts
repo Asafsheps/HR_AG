@@ -25,7 +25,7 @@ export async function GET(
     const candidate = DEMO_CANDIDATES.find(c => c.id === id) ?? DEMO_CANDIDATES[0];
     const messages  = id === "demo-1" ? DEMO_MESSAGES : [];
     const notes     = id === "demo-1" ? DEMO_NOTES    : [];
-    return NextResponse.json({ success: true, data: { ...candidate, whatsapp_messages: messages, candidate_notes: notes } });
+    return NextResponse.json({ success: true, data: { ...candidate, messages: messages, candidate_notes: notes } });
   }
 
   const supabase = await getSupabaseServerClient();
@@ -59,7 +59,7 @@ export async function GET(
 
   // Fetch WhatsApp messages
   const { data: messages } = await db
-    .from("whatsapp_messages")
+    .from("messages")
     .select("id, direction, sender, body, created_at")
     .eq("candidate_id", id)
     .order("created_at", { ascending: true })

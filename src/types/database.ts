@@ -236,7 +236,10 @@ interface RawDatabase {
         };
       };
 
-      whatsapp_messages: {
+      // Renamed from whatsapp_messages in migration 017: the web chat is
+      // now the primary channel, and the old name described a table that
+              // mostly holds web transcripts.
+      messages: {
         Row: {
           id:                   string;
           candidate_id:         string;
@@ -245,7 +248,8 @@ interface RawDatabase {
           sender:               DbMessageSender;
           content:              string;
           media_url:            string | null;
-          whatsapp_message_id:  string | null;
+          provider_message_id:  string | null;
+          channel:              DbConversationChannel;
           sent_at:              string;
         };
         Insert: {
@@ -256,7 +260,8 @@ interface RawDatabase {
           sender:                DbMessageSender;
           content:               string;
           media_url?:            string | null;
-          whatsapp_message_id?:  string | null;
+          provider_message_id?:  string | null;
+          channel?:              DbConversationChannel;
           sent_at?:              string;
         };
         Update: never;  // messages are immutable
@@ -265,26 +270,51 @@ interface RawDatabase {
       conversation_contexts: {
         Row: {
           id:                     string;
-          candidate_id:           string;
+          // Nullable since migration 017: a web visitor starts talking
+          // before we know who they are.
+          candidate_id:           string | null;
           organization_id:        string;
+          job_id:                 string | null;
           current_question_index: number;
           is_complete:            boolean;
           metadata:               Json;
+          channel:                DbConversationChannel;
+          session_token:          string | null;
+          campaign_id:            string | null;
+          transcript:             Json;
+          cv_text:                string | null;
+          flags:                  Json;
+          started_at:             string;
+          ended_at:               string | null;
           updated_at:             string;
         };
         Insert: {
           id?:                     string;
-          candidate_id:            string;
+          candidate_id?:           string | null;
           organization_id:         string;
+          job_id?:                 string | null;
           current_question_index?: number;
           is_complete?:            boolean;
           metadata?:               Json;
-          updated_at?:             string;
+          channel?:                DbConversationChannel;
+          session_token?:          string | null;
+          campaign_id?:            string | null;
+          transcript?:             Json;
+          cv_text?:                string | null;
+          flags?:                  Json;
+          started_at?:             string;
+          ended_at?:               string | null;
         };
         Update: {
+          candidate_id?:           string | null;
+          job_id?:                 string | null;
           current_question_index?: number;
           is_complete?:            boolean;
           metadata?:               Json;
+          transcript?:             Json;
+          cv_text?:                string | null;
+          flags?:                  Json;
+          ended_at?:               string | null;
           updated_at?:             string;
         };
       };

@@ -66,7 +66,7 @@ export async function saveContext(
     .eq("candidate_id", candidateId);
 }
 
-// ── Append a message to whatsapp_messages ──────────────────────────────────────
+// ── Append a message to messages ──────────────────────────────────────
 export async function appendMessage(
   supabase: DB,
   params: {
@@ -79,14 +79,14 @@ export async function appendMessage(
     providerId?:    string;  // dedup key
   }
 ): Promise<void> {
-  await supabase.from("whatsapp_messages").insert({
+  await supabase.from("messages").insert({
     candidate_id:        params.candidateId,
     organization_id:     params.organizationId,
     direction:           params.direction,
     sender:              params.sender,
     content:             params.content,
     media_url:           params.mediaUrl ?? null,
-    whatsapp_message_id: params.providerId ?? null,
+    provider_message_id: params.providerId ?? null,
   });
 }
 
@@ -97,7 +97,7 @@ export async function loadTranscript(
   limit = 20
 ): Promise<Array<{ role: "user" | "assistant"; content: string }>> {
   const { data } = await supabase
-    .from("whatsapp_messages")
+    .from("messages")
     .select("direction, sender, content")
     .eq("candidate_id", candidateId)
     .order("sent_at", { ascending: false })

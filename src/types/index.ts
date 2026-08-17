@@ -147,7 +147,7 @@ export interface WhatsAppMessage {
   sender: MessageSender;
   content: string;
   media_url?: string;
-  whatsapp_message_id?: string;
+  provider_message_id?: string;
   sent_at: string;
 }
 

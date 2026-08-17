@@ -6,9 +6,9 @@
 // it is 24 random bytes, which is why it can be.
 //
 // Everything the candidate sends is wrapped as data before it reaches the
-// model. The interviewer cannot score and has no database access; both are
-// enforced by what this route does and does not do, not by asking the model
-// nicely.
+// model. The interviewer cannot score and has no database access of its
+// own; both are enforced by what this route does and does not do, not by
+// asking the model nicely.
 
 import { NextRequest, NextResponse } from "next/server";
 import { apiSuccess, apiError } from "@/lib/utils";
@@ -16,9 +16,7 @@ import { checkRateLimit } from "@/lib/security/rate-limiter";
 import { sanitizeMessage } from "@/lib/security/prompt-safety";
 import { callAI } from "@/lib/ai/providers";
 import { buildInterviewerPrompt, wrapCandidateTurn, shouldEnd } from "@/lib/interview/prompt";
-import {
-  getDemoSession, appendDemoTurn, endDemoSession, flagDemoSession,
-} from "@/lib/interview/session";
+import { loadSession, appendTurn, endSession, addFlags } from "@/lib/interview/store";
 import type { AIMessage } from "@/types";
 
 type Params = { params: Promise<{ token: string }> };
@@ -34,15 +32,15 @@ function publicTurns(turns: { role: string; content: string; at: string }[]) {
 
 export async function GET(_req: NextRequest, { params }: Params) {
   const { token } = await params;
-  const session = getDemoSession(token);
+  const session = await loadSession(token);
   if (!session) return NextResponse.json(apiError("השיחה לא נמצאה או הסתיימה"), { status: 404 });
 
   return NextResponse.json(apiSuccess({
     job_title:  session.job.title,
     agent_name: session.agent.persona_name,
-    candidate:  session.candidate.full_name,
+    candidate:  session.candidateName,
     turns:      publicTurns(session.turns),
-    ended:      Boolean(session.endedAt),
+    ended:      session.ended,
   }));
 }
 
@@ -56,9 +54,9 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json(apiError("יותר מדי הודעות. נסה שוב מאוחר יותר."), { status: 429 });
   }
 
-  const session = getDemoSession(token);
-  if (!session) return NextResponse.json(apiError("השיחה לא נמצאה או הסתיימה"), { status: 404 });
-  if (session.endedAt) return NextResponse.json(apiError("השיחה הסתיימה"), { status: 409 });
+  const session = await loadSession(token);
+  if (!session)       return NextResponse.json(apiError("השיחה לא נמצאה או הסתיימה"), { status: 404 });
+  if (session.ended)  return NextResponse.json(apiError("השיחה הסתיימה"), { status: 409 });
 
   const body = await req.json().catch(() => null) as { message?: string } | null;
   const raw  = body?.message ?? "";
@@ -73,7 +71,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     session.agent,
     session.job,
     session.cvText,
-    session.candidate.full_name,
+    session.candidateName,
   );
 
   const messages: AIMessage[] = session.turns.map(t => ({
@@ -81,15 +79,27 @@ export async function POST(req: NextRequest, { params }: Params) {
     content: t.content,
   }));
 
+  let turnsSoFar = session.turns;
+
   if (!isOpening) {
     const { text, signals } = sanitizeMessage(raw);
 
     // Flag, do not block. A candidate whose phrasing trips a pattern still
     // gets interviewed; the flag surfaces on the recruiter's side.
-    if (signals.length) flagDemoSession(token, signals);
+    if (signals.length) await addFlags(session.contextId, [], signals);
 
     const wrapped = wrapCandidateTurn(text);
-    appendDemoTurn(token, { role: "user", content: wrapped, at: new Date().toISOString() });
+    const userTurn = { role: "user" as const, content: wrapped, at: new Date().toISOString() };
+
+    await appendTurn({
+      contextId:      session.contextId,
+      candidateId:    session.candidateId,
+      organizationId: session.organizationId,
+      turns:          turnsSoFar,
+      turn:           userTurn,
+    });
+
+    turnsSoFar = [...turnsSoFar, userTurn];
     messages.push({ role: "user", content: wrapped });
   } else {
     messages.push({ role: "user", content: "התחל את הריאיון." });
@@ -97,28 +107,30 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   let reply: string;
   try {
-    const res = await callAI(messages, {
-      systemPrompt,
-      maxTokens:   700,
-      temperature: 0.7,
-    });
+    const res = await callAI(messages, { systemPrompt, maxTokens: 700, temperature: 0.7 });
     reply = res.content.trim();
   } catch (e) {
     // Do not surface the provider's error to a candidate — it can leak
-    // model names, keys in messages, or internal endpoints.
+    // model names, keys echoed in messages, or internal endpoints.
     console.error("[interview] AI call failed:", e);
-    return NextResponse.json(
-      apiError("תקלה זמנית. נסה לשלוח שוב בעוד רגע."),
-      { status: 502 }
-    );
+    return NextResponse.json(apiError("תקלה זמנית. נסה לשלוח שוב בעוד רגע."), { status: 502 });
   }
 
-  appendDemoTurn(token, { role: "assistant", content: reply, at: new Date().toISOString() });
+  const aiTurn = { role: "assistant" as const, content: reply, at: new Date().toISOString() };
+  await appendTurn({
+    contextId:      session.contextId,
+    candidateId:    session.candidateId,
+    organizationId: session.organizationId,
+    turns:          turnsSoFar,
+    turn:           aiTurn,
+  });
 
   // Count the agent's own turns rather than trusting it to stop on its own.
-  const assistantTurns = session.turns.filter(t => t.role === "assistant").length;
+  // A model told "maximum 6 questions" will occasionally ask a seventh, and
+  // the cap bounds cost as well as candidate patience.
+  const assistantTurns = turnsSoFar.filter(t => t.role === "assistant").length + 1;
   const ended = shouldEnd(assistantTurns, session.agent.max_questions);
-  if (ended) endDemoSession(token);
+  if (ended) await endSession(session.contextId);
 
   return NextResponse.json(apiSuccess({ reply, ended }));
 }

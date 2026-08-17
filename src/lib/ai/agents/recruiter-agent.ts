@@ -105,9 +105,9 @@ async function runAgent(
   // ── 2. Dedup by provider message ID ─────────────────────────────────────────
   if (params.providerId) {
     const { data: existing } = await supabase
-      .from("whatsapp_messages")
+      .from("messages")
       .select("id")
-      .eq("whatsapp_message_id", params.providerId)
+      .eq("provider_message_id", params.providerId)
       .maybeSingle();
     if (existing) return { sent: false, reason: "dedup" };
   }
