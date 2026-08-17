@@ -33,6 +33,9 @@ export async function loginAction(input: LoginInput) {
     if (error.message.includes("Invalid login credentials")) {
       return { error: "מייל או סיסמה שגויים" };
     }
+    // Server-side only. The candidate-facing message stays generic, but an
+    // unmapped auth failure with no log is undiagnosable in production.
+    console.error("[auth] signInWithPassword failed:", error.status, error.code, error.message);
     return { error: "שגיאה בהתחברות. נסה שוב." };
   }
 
