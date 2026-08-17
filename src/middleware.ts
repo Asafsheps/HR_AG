@@ -13,8 +13,19 @@ const PROTECTED_PATHS = [
   "/settings",
 ];
 
-// Public paths — skip all auth checks (apply page + its APIs)
-const PUBLIC_PATHS = ["/apply", "/api/apply"];
+// Public paths — skip all auth checks.
+// Candidate-facing routes must stay reachable without a session: someone
+// arriving from an ad has no account and never will.
+//   /j              campaign landing page
+//   /chat           the interview itself
+//   /api/interview  starting and continuing an interview
+//   /api/campaigns  reading a campaign's job
+// These are rate limited inside their handlers rather than gated here.
+const PUBLIC_PATHS = [
+  "/apply", "/api/apply",
+  "/j", "/chat",
+  "/api/interview", "/api/campaigns",
+];
 
 // Routes only for unauthenticated users (redirect away if logged in)
 const AUTH_PATHS = ["/login", "/register"];
