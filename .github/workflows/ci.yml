@@ -45,7 +45,8 @@ jobs:
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
       SUPABASE_SERVICE_ROLE_KEY:     ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       ANTHROPIC_API_KEY:             ${{ secrets.ANTHROPIC_API_KEY }}
-      NEXT_PUBLIC_APP_URL:           https://hr-project.vercel.app
+      GEMINI_API_KEY:                ${{ secrets.GEMINI_API_KEY }}
+      NEXT_PUBLIC_APP_URL:           https://hr-ag.vercel.app
 
     steps:
       - name: Checkout
