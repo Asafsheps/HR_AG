@@ -11,7 +11,9 @@
 
 import type { AIMessage, AIRequestOptions, AIResponse } from "@/types";
 
-const DEFAULT_MODEL = process.env.GEMINI_DEFAULT_MODEL ?? "gemini-2.5-flash";
+// gemini-2.5-flash is closed to new API keys; Google's own 404 points at
+// 3.6-flash as the replacement.
+const DEFAULT_MODEL = process.env.GEMINI_DEFAULT_MODEL ?? "gemini-3.6-flash";
 const DEFAULT_MAX_TOKENS = 1024;
 const API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 
