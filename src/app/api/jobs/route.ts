@@ -9,6 +9,8 @@ import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { createJobSchema } from "@/lib/validators/job";
 import { slugify, apiSuccess, apiError } from "@/lib/utils";
 import type { DbJobStatus } from "@/types/database";
+import { agentGuidanceSchema } from "@/lib/validators/agent";
+import { generateCampaignCode, landingUrl } from "@/lib/campaigns/code";
 
 // Mirrors the job_status enum in supabase/migrations/..._extensions_and_enums.sql
 const JOB_STATUSES: readonly DbJobStatus[] = ["draft", "active", "paused", "closed", "archived"];
@@ -90,5 +92,57 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(apiError(error.message), { status: 500 });
   }
 
-  return NextResponse.json(apiSuccess(job), { status: 201 });
+  // ── Agent profile ────────────────────────────────────────────────────
+  // Guidance is per-job, so each job gets its own profile rather than
+  // sharing a global one. Failure here must not lose the job the user just
+  // filled in five steps of — it degrades to the org default instead.
+  const agent = agentGuidanceSchema.safeParse(body.agent);
+  if (agent.success) {
+    const { data: agentProfile } = await supabase
+      .from("agent_profiles")
+      .insert({
+        organization_id: profile.organization_id,
+        name:            `סוכן — ${parsed.data.title}`,
+        persona_name:    agent.data.persona_name,
+        tone:            agent.data.tone,
+        objective:       agent.data.objective,
+        guidelines:      agent.data.guidelines,
+        max_questions:   agent.data.max_questions,
+      })
+      .select("id")
+      .single();
+
+    if (agentProfile) {
+      await supabase.from("jobs").update({ agent_profile_id: agentProfile.id }).eq("id", job.id);
+    }
+  }
+
+  // ── Campaign ─────────────────────────────────────────────────────────
+  // Only an active job gets one: a draft has nowhere to send candidates,
+  // and a live link to an unfinished posting is worse than no link.
+  let landing_url: string | null = null;
+  if (job.status === "active") {
+    // The unique index on `code` is the real guard. Retry a couple of times
+    // on the rare collision rather than failing the publish.
+    for (let attempt = 0; attempt < 3 && !landing_url; attempt++) {
+      const code = generateCampaignCode();
+      const url  = landingUrl(code);
+
+      const { error: campaignError } = await supabase
+        .from("campaigns")
+        .insert({
+          organization_id: profile.organization_id,
+          job_id:          job.id,
+          code,
+          channel:         "direct",
+          ad_copy:         "",
+          landing_url:     url,
+        });
+
+      if (!campaignError) landing_url = url;
+      else if (campaignError.code !== "23505") break;   // not a unique violation
+    }
+  }
+
+  return NextResponse.json(apiSuccess({ ...job, landing_url }), { status: 201 });
 }

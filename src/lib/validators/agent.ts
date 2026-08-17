@@ -51,6 +51,20 @@ export const agentProfileSchema = z.object({
     { message: "סף הדחייה חייב להיות נמוך מסף ההסלמה", path: ["reject_score"] }
   );
 
+/**
+ * The subset of agent settings the job wizard sends inline with a new job.
+ * Kept separate from agentProfileSchema, which covers the full profile
+ * editor including stages and scoring criteria.
+ */
+export const agentGuidanceSchema = z.object({
+  persona_name:  z.string().min(1).default("עמי"),
+  tone:          z.enum(["friendly", "professional", "strict", "concise"]).default("friendly"),
+  objective:     z.string().default(""),
+  guidelines:    z.string().default(""),
+  max_questions: z.number().int().min(1).max(30).default(8),
+});
+
+export type AgentGuidanceInput   = z.infer<typeof agentGuidanceSchema>;
 export type AgentProfileInput    = z.infer<typeof agentProfileSchema>;
 export type AgentStageInput      = z.infer<typeof agentStageSchema>;
 export type ScoringCriterionInput = z.infer<typeof scoringCriterionSchema>;
