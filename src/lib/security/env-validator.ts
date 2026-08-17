@@ -22,9 +22,12 @@ const ENV_SCHEMA: EnvVar[] = [
   { name: "NEXT_PUBLIC_SUPABASE_ANON_KEY", required: true,  description: "Supabase anon key" },
   { name: "SUPABASE_SERVICE_ROLE_KEY",     required: true,  description: "Supabase service role key" },
 
-  // AI
-  { name: "ANTHROPIC_API_KEY",             required: true,  description: "Anthropic API key",            validator: (v) => v.startsWith("sk-ant-") },
-  { name: "OPENAI_API_KEY",                required: false, description: "OpenAI API key (fallback)",    validator: (v) => v.startsWith("sk-") },
+  // AI — no single provider is required; what is required is that at least
+  // one of them is configured, which validateEnv checks separately below.
+  { name: "ANTHROPIC_API_KEY",             required: false, description: "Anthropic API key",            validator: (v) => v.startsWith("sk-ant-") },
+  { name: "OPENAI_API_KEY",                required: false, description: "OpenAI API key",               validator: (v) => v.startsWith("sk-") },
+  { name: "GEMINI_API_KEY",                required: false, description: "Google Gemini API key" },
+  { name: "OPENROUTER_API_KEY",            required: false, description: "OpenRouter API key",           validator: (v) => v.startsWith("sk-or-") },
 
   // WhatsApp
   { name: "TWILIO_ACCOUNT_SID",            required: false, description: "Twilio Account SID",           validator: (v) => v.startsWith("AC") },
@@ -40,8 +43,14 @@ const ENV_SCHEMA: EnvVar[] = [
 
   // App
   { name: "NEXT_PUBLIC_APP_URL",           required: false, description: "Public app URL",               validator: (v) => v.startsWith("http") },
-  { name: "AI_DEFAULT_PROVIDER",           required: false, description: "Default AI provider (anthropic|openai)" },
+  { name: "AI_DEFAULT_PROVIDER",           required: false, description: "Default AI provider (openrouter|gemini|anthropic|openai|ollama)" },
 ];
+
+/** A placeholder is as good as unset; mirror configuredProviders' rule. */
+function isRealKey(v: string | undefined): boolean {
+  const t = v?.trim();
+  return Boolean(t && t.length > 20 && !/placeholder|your[-_]?key|changeme|xxx/i.test(t));
+}
 
 export interface EnvValidationResult {
   valid:    boolean;
@@ -72,6 +81,22 @@ export function validateEnv(): EnvValidationResult {
       if (schema.required) errors.push(msg);
       else                  warnings.push(msg);
     }
+  }
+
+  // At least one AI provider must actually work — interviews and scoring
+  // both die without one. Ollama counts only when it is the chosen default,
+  // since it needs no key but does need a local server.
+  const anyProvider =
+    isRealKey(process.env.ANTHROPIC_API_KEY) ||
+    isRealKey(process.env.OPENAI_API_KEY) ||
+    isRealKey(process.env.GEMINI_API_KEY) ||
+    isRealKey(process.env.OPENROUTER_API_KEY) ||
+    process.env.AI_DEFAULT_PROVIDER?.trim() === "ollama";
+
+  if (!anyProvider) {
+    errors.push(
+      "No AI provider configured: set at least one of OPENROUTER_API_KEY / GEMINI_API_KEY / ANTHROPIC_API_KEY / OPENAI_API_KEY"
+    );
   }
 
   return { valid: errors.length === 0, errors, warnings };
