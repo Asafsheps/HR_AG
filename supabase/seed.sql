@@ -30,11 +30,18 @@ begin
   -- Inserting straight into auth.users is supported locally. The
   -- handle_new_user trigger reads organization_id out of
   -- raw_user_meta_data, so it must be present here.
+  -- The token columns must be '' and not NULL: GoTrue scans them into Go
+  -- strings, and a NULL kills every password sign-in with a 500
+  -- ("converting NULL to string is unsupported"). Their column default is
+  -- NULL, so they have to be set explicitly here.
   insert into auth.users (
     id, instance_id, aud, role, email,
     encrypted_password, email_confirmed_at,
     raw_app_meta_data, raw_user_meta_data,
-    created_at, updated_at
+    created_at, updated_at,
+    confirmation_token, recovery_token,
+    email_change_token_new, email_change_token_current,
+    email_change, phone_change, phone_change_token
   )
   values (
     v_user_id,
@@ -49,7 +56,8 @@ begin
       'full_name',       'אסף',
       'role',            'super_admin'
     ),
-    now(), now()
+    now(), now(),
+    '', '', '', '', '', '', ''
   )
   on conflict (id) do nothing;
 
