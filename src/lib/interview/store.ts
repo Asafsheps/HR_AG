@@ -33,6 +33,7 @@ export interface StoredSession {
   organizationId: string;
   jobId:        string;
   candidateName: string;
+  campaignCode: string;
   cvText:       string;
   agent:        AgentConfig;
   job:          JobConfig;
@@ -106,6 +107,11 @@ export async function loadCampaignConfig(code: string) {
  * even if they abandon halfway, and that is exactly who gets lost when the
  * record is only written on completion.
  */
+export type CreateSessionResult =
+  | { kind: "created";  token: string; contextId: string; candidateId: string }
+  | { kind: "resumed";  token: string; contextId: string; candidateId: string }
+  | { kind: "finished" };
+
 export async function createSession(params: {
   sessionToken:   string;
   campaignId:     string;
@@ -117,7 +123,7 @@ export async function createSession(params: {
   cvText:         string;
   cvUrl?:         string | null;
   flags:          { id: string; excerpt: string }[];
-}): Promise<{ contextId: string; candidateId: string }> {
+}): Promise<CreateSessionResult> {
   const supabase = adminClient();
 
   // A returning applicant keeps one row per (job, email) — the schema's own
@@ -139,6 +145,33 @@ export async function createSession(params: {
 
   if (candErr || !candidate) {
     throw new Error(`Could not create candidate: ${candErr?.message ?? "unknown"}`);
+  }
+
+  // ── Already applied to this job? ───────────────────────────────────
+  // One session per (candidate, job) is enforced by a unique index. That
+  // constraint is deliberate, and the three cases need different answers:
+  //
+  //   unfinished  → hand back the same token, so someone who closed the
+  //                 tab mid-interview picks up where they left off instead
+  //                 of starting over.
+  //   finished    → refuse. Re-interviewing after seeing the questions is
+  //                 exactly how a candidate would game the score.
+  //   none        → create it.
+  const { data: existing } = await supabase
+    .from("conversation_contexts")
+    .select("id, session_token, ended_at")
+    .eq("candidate_id", candidate.id)
+    .eq("job_id", params.jobId)
+    .maybeSingle();
+
+  if (existing) {
+    if (existing.ended_at) return { kind: "finished" };
+    return {
+      kind:        "resumed",
+      token:       existing.session_token ?? params.sessionToken,
+      contextId:   existing.id,
+      candidateId: candidate.id,
+    };
   }
 
   const now = new Date().toISOString();
@@ -165,7 +198,7 @@ export async function createSession(params: {
     throw new Error(`Could not create session: ${ctxErr?.message ?? "unknown"}`);
   }
 
-  return { contextId: ctx.id, candidateId: candidate.id };
+  return { kind: "created", token: params.sessionToken, contextId: ctx.id, candidateId: candidate.id };
 }
 
 /** Load a session by its token. Returns null for unknown or expired tokens. */
@@ -177,6 +210,7 @@ export async function loadSession(token: string): Promise<StoredSession | null> 
     .select(`
       id, candidate_id, organization_id, job_id, cv_text, transcript, ended_at,
       candidates ( full_name ),
+      campaigns ( code ),
       jobs (
         title, description, requirements, screening_questions, ai_instructions,
         agent_profiles ( persona_name, tone, objective, guidelines, max_questions )
@@ -195,6 +229,7 @@ export async function loadSession(token: string): Promise<StoredSession | null> 
   } | null;
 
   const candidate = data.candidates as unknown as { full_name: string } | null;
+  const campaign  = data.campaigns  as unknown as { code: string } | null;
 
   if (!job) return null;
 
@@ -204,6 +239,7 @@ export async function loadSession(token: string): Promise<StoredSession | null> 
     organizationId: data.organization_id,
     jobId:          data.job_id ?? "",
     candidateName:  candidate?.full_name ?? "",
+    campaignCode:   campaign?.code ?? "",
     cvText:         data.cv_text ?? "",
     agent: job.agent_profiles ?? {
       persona_name: "עמי", tone: "friendly", objective: "", guidelines: "", max_questions: 6,

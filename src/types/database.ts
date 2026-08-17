@@ -370,6 +370,68 @@ interface RawDatabase {
         };
       };
 
+      // ── Migration 019 ────────────────────────────────────────────────
+      candidate_scores: {
+        Row: {
+          id:               string;
+          candidate_id:     string;
+          organization_id:  string;
+          job_id:           string;
+          overall:          number;
+          tools_match:      number | null;
+          domain_match:     number | null;
+          seniority_match:  number | null;
+          communication:    number | null;
+          confidence:       number | null;
+          motivation:       number | null;
+          reasoning:        Json;
+          summary:          string;
+          strengths:        string[];
+          concerns:         string[];
+          evidence_quality: "strong" | "partial" | "thin";
+          model:            string;
+          provider:         string;
+          prompt_version:   string;
+          scored_at:        string;
+        };
+        Insert: {
+          id?:               string;
+          candidate_id:      string;
+          organization_id:   string;
+          job_id:            string;
+          overall:           number;
+          tools_match?:      number | null;
+          domain_match?:     number | null;
+          seniority_match?:  number | null;
+          communication?:    number | null;
+          confidence?:       number | null;
+          motivation?:       number | null;
+          reasoning:         Json;
+          summary?:          string;
+          strengths?:        string[];
+          concerns?:         string[];
+          evidence_quality?: "strong" | "partial" | "thin";
+          model:             string;
+          provider:          string;
+          prompt_version?:   string;
+          scored_at?:        string;
+        };
+        Update: {
+          overall?:          number;
+          tools_match?:      number | null;
+          domain_match?:     number | null;
+          seniority_match?:  number | null;
+          communication?:    number | null;
+          confidence?:       number | null;
+          motivation?:       number | null;
+          reasoning?:        Json;
+          summary?:          string;
+          strengths?:        string[];
+          concerns?:         string[];
+          evidence_quality?: "strong" | "partial" | "thin";
+        };
+      };
+
       // ── Migration 015 ────────────────────────────────────────────────
       client_companies: {
         Row: {
@@ -699,7 +761,41 @@ interface RawDatabase {
       };
 
     };
-    Views:     Record<string, never>;
+    Views: {
+      // Migration 019. Read-only; security_invoker keeps RLS in force.
+      candidate_rankings: {
+        Row: {
+          candidate_id:       string;
+          organization_id:    string;
+          job_id:             string;
+          full_name:          string;
+          email:              string;
+          phone:              string;
+          status:             DbCandidateStatus;
+          cv_url:             string | null;
+          birth_year:         number | null;
+          gender:             DbGender | null;
+          applied_at:         string;
+          job_title:          string;
+          overall:            number | null;
+          tools_match:        number | null;
+          domain_match:       number | null;
+          seniority_match:    number | null;
+          communication:      number | null;
+          confidence:         number | null;
+          motivation:         number | null;
+          summary:            string | null;
+          strengths:          string[] | null;
+          concerns:           string[] | null;
+          evidence_quality:   "strong" | "partial" | "thin" | null;
+          scored_at:          string | null;
+          age:                number | null;
+          interview_complete: boolean;
+          turn_count:         number;
+          flag_count:         number;
+        };
+      };
+    };
     Functions: {
       get_current_org_id: {
         Args:    Record<string, never>;
@@ -736,7 +832,9 @@ type AddRelationships<T> = {
 export type Database = {
   public: {
     Tables: AddRelationships<RawDatabase["public"]["Tables"]>;
-    Views: RawDatabase["public"]["Views"];
+    // Views need Relationships too, same as tables, or supabase-js resolves
+    // every selected column to `never`.
+    Views: AddRelationships<RawDatabase["public"]["Views"]>;
     Functions: RawDatabase["public"]["Functions"];
     Enums: RawDatabase["public"]["Enums"];
   };

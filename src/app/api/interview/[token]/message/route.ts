@@ -14,9 +14,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { apiSuccess, apiError } from "@/lib/utils";
 import { checkRateLimit } from "@/lib/security/rate-limiter";
 import { sanitizeMessage } from "@/lib/security/prompt-safety";
-import { callAI } from "@/lib/ai/providers";
+import { callAI, aiRoleOptions } from "@/lib/ai/providers";
 import { buildInterviewerPrompt, wrapCandidateTurn, shouldEnd } from "@/lib/interview/prompt";
-import { loadSession, appendTurn, endSession, addFlags } from "@/lib/interview/store";
+import { loadSession, appendTurn, endSession, addFlags, bumpQualified } from "@/lib/interview/store";
+import { scoreInterview } from "@/lib/interview/scorer";
 import type { AIMessage } from "@/types";
 
 type Params = { params: Promise<{ token: string }> };
@@ -107,7 +108,14 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   let reply: string;
   try {
-    const res = await callAI(messages, { systemPrompt, maxTokens: 700, temperature: 0.7 });
+    // 1400 rather than 700: Gemini counts internal reasoning against the
+    // output budget, and at 700 replies arrived truncated mid-sentence.
+    const res = await callAI(messages, {
+      systemPrompt,
+      maxTokens: 1400,
+      temperature: 0.7,
+      ...aiRoleOptions("interview"),
+    });
     reply = res.content.trim();
   } catch (e) {
     // Do not surface the provider's error to a candidate — it can leak
@@ -130,7 +138,25 @@ export async function POST(req: NextRequest, { params }: Params) {
   // the cap bounds cost as well as candidate patience.
   const assistantTurns = turnsSoFar.filter(t => t.role === "assistant").length + 1;
   const ended = shouldEnd(assistantTurns, session.agent.max_questions);
-  if (ended) await endSession(session.contextId);
+
+  if (ended) {
+    await endSession(session.contextId);
+
+    // Score in a separate pass, awaited so the recruiter sees a result
+    // immediately rather than an empty row that fills in later. A scoring
+    // failure must not affect the candidate, who has already finished —
+    // scoreInterview swallows its own errors and returns null.
+    const scored = await scoreInterview({
+      candidateId:    session.candidateId,
+      organizationId: session.organizationId,
+      jobId:          session.jobId,
+      candidateName:  session.candidateName,
+      job:            session.job,
+      turns:          [...turnsSoFar, aiTurn],
+    });
+
+    if (scored) await bumpQualified(session.campaignCode).catch(() => {});
+  }
 
   return NextResponse.json(apiSuccess({ reply, ended }));
 }

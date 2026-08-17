@@ -71,11 +71,11 @@ export async function POST(req: NextRequest) {
   }
 
   const sanitized = sanitizeCvText(cvText);
-  const token = newSessionToken();
 
+  let result;
   try {
-    await createSession({
-      sessionToken:   token,
+    result = await createSession({
+      sessionToken:   newSessionToken(),
       campaignId:     config.campaignId,
       organizationId: config.organizationId,
       jobId:          config.jobId,
@@ -93,13 +93,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(apiError("תקלה בשמירת הפרטים. נסה שוב."), { status: 500 });
   }
 
-  // Count the conversion in-process. An HTTP call back to our own server
-  // would add a round trip and a failure mode for a counter bump.
-  // A counter failure must never fail an interview, hence the catch.
-  await bumpConversions(code).catch(() => {});
+  if (result.kind === "finished") {
+    return NextResponse.json(
+      apiError("כבר השלמת ריאיון למשרה הזו. נחזור אליך בהמשך."),
+      { status: 409 }
+    );
+  }
+
+  // Only count a conversion once. A resumed session was already counted,
+  // and double-counting would make the funnel report look better than it is.
+  if (result.kind === "created") {
+    await bumpConversions(code).catch(() => {});
+  }
 
   return NextResponse.json(apiSuccess({
-    session_token: token,
+    session_token: result.token,
+    resumed:       result.kind === "resumed",
     cv_warning:    cvWarning,
   }), { status: 201 });
 }

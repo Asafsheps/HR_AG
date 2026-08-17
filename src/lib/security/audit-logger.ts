@@ -21,6 +21,9 @@ export type AuditAction =
   | "assignment.created"
   | "assignment.evaluated"
   | "ai.score_triggered"
+  // Filtering candidates by a regulated attribute (age, gender). Logged so
+  // there is a record of who filtered by what, rather than no record at all.
+  | "candidates.filter_regulated"
   | "auth.login"
   | "auth.register"
   | "auth.logout";
