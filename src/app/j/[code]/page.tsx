@@ -36,6 +36,15 @@ interface Campaign {
 const MAX_CV_MB = 5;
 const ACCEPTED = ".pdf,.doc,.docx";
 
+// The database stores the enum value. Showing "full_time" to a candidate
+// looks like a bug on the first page they ever see of the product.
+const EMPLOYMENT_LABELS: Record<string, string> = {
+  full_time:  "משרה מלאה",
+  part_time:  "משרה חלקית",
+  contract:   "פרילנס / קבלן",
+  internship: "התמחות",
+};
+
 export default function CampaignLandingPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = use(params);
   const router = useRouter();
@@ -148,7 +157,8 @@ export default function CampaignLandingPage({ params }: { params: Promise<{ code
             )}
             {job.employment_type && (
               <span className="flex items-center gap-1.5">
-                <Briefcase className="w-4 h-4" />{job.employment_type}
+                <Briefcase className="w-4 h-4" />
+                {EMPLOYMENT_LABELS[job.employment_type] ?? job.employment_type}
               </span>
             )}
           </div>
