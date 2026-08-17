@@ -49,3 +49,5 @@ coverage/
 .claude/
 
 dev.log
+.vercel
+.env*
