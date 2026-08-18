@@ -16,7 +16,8 @@
 
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
-import { callAI, aiRoleOptions } from "@/lib/ai/providers";
+import { callAI } from "@/lib/ai/providers";
+import { aiRoleOptionsFor } from "@/lib/ai/settings";
 import { wrapUntrusted } from "@/lib/security/prompt-safety";
 import type { InterviewTurn } from "./session";
 import type { JobConfig } from "./prompt";
@@ -160,9 +161,9 @@ export async function scoreInterview(params: {
         // Low temperature: scoring should be repeatable. The same
         // transcript scored twice should not swing by fifteen points.
         temperature:  0.2,
-        // AI_SCORING_PROVIDER / AI_SCORING_MODEL override — scoring can run
-        // a stronger model than the chat without touching the interviewer.
-        ...aiRoleOptions("scoring"),
+        // Settings-screen or env override — scoring can run a stronger
+        // model than the chat without touching the interviewer.
+        ...(await aiRoleOptionsFor("scoring", params.organizationId)),
       }
     );
 

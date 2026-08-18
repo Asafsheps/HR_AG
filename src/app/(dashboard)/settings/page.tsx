@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Building2, MessageCircle, Bell, Bot, Check, Copy,
   Eye, EyeOff, ExternalLink, AlertCircle, CheckCircle2,
@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type Tab = "general" | "whatsapp" | "notifications" | "agent";
+type Tab = "general" | "whatsapp" | "notifications" | "agent" | "ai";
 type Provider = "twilio" | "meta";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -441,9 +441,176 @@ function AgentTab() {
   );
 }
 
+// ─── AI connection tab ───────────────────────────────────────────────────────
+// Which provider/model runs the interview vs the scoring. Reads and writes
+// /api/settings/ai; a save takes effect within a minute (resolver cache),
+// no redeploy. Keys stay in env — this screen only chooses among providers
+// that already have one.
+
+const PROVIDER_LABELS: Record<string, string> = {
+  openrouter: "OpenRouter",
+  gemini:     "Google Gemini",
+  anthropic:  "Anthropic (Claude)",
+  openai:     "OpenAI",
+  ollama:     "Ollama (מקומי)",
+};
+
+const MODEL_HINTS: Record<string, string> = {
+  openrouter: "למשל anthropic/claude-sonnet-5 או google/gemini-3.6-flash",
+  gemini:     "למשל gemini-3.6-flash",
+  anthropic:  "למשל claude-sonnet-5",
+  openai:     "למשל gpt-4o-mini",
+  ollama:     "למשל qwen2.5-coder:7b",
+};
+
+interface AiRole { provider: string | null; model: string | null; source: string }
+interface AiConfig {
+  configured: string[];
+  overrides: Record<string, string | null> | null;
+  effective: { interview: AiRole; scoring: AiRole };
+}
+
+function AiTab() {
+  const [config, setConfig]   = useState<AiConfig | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving]   = useState(false);
+  const [saved, setSaved]     = useState(false);
+  const [error, setError]     = useState("");
+
+  const [form, setForm] = useState({
+    interview_provider: "", interview_model: "",
+    scoring_provider: "",   scoring_model: "",
+  });
+
+  const load = () => {
+    fetch("/api/settings/ai")
+      .then(r => r.json())
+      .then(d => {
+        if (d.success) {
+          setConfig(d.data);
+          const o = d.data.overrides ?? {};
+          setForm({
+            interview_provider: o.interview_provider ?? "",
+            interview_model:    o.interview_model ?? "",
+            scoring_provider:   o.scoring_provider ?? "",
+            scoring_model:      o.scoring_model ?? "",
+          });
+        } else setError(d.error ?? "שגיאה בטעינה");
+      })
+      .catch(() => setError("שגיאת רשת"))
+      .finally(() => setLoading(false));
+  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, []);
+
+  async function save() {
+    setSaving(true); setError(""); setSaved(false);
+    try {
+      const r = await fetch("/api/settings/ai", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          interview_provider: form.interview_provider || null,
+          interview_model:    form.interview_model || null,
+          scoring_provider:   form.scoring_provider || null,
+          scoring_model:      form.scoring_model || null,
+        }),
+      });
+      const d = await r.json();
+      if (d.success) { setSaved(true); setTimeout(() => setSaved(false), 3000); load(); }
+      else setError(d.error ?? "השמירה נכשלה");
+    } catch {
+      setError("שגיאת רשת — נסה שוב");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) return <p className="text-sm text-neutral-400 py-8 text-center">טוען…</p>;
+  if (!config)  return <p className="text-sm text-red-600 py-8 text-center">{error || "שגיאה"}</p>;
+
+  const roleBlock = (roleKey: "interview" | "scoring", title: string, desc: string) => {
+    const eff = config.effective[roleKey];
+    const providerField = `${roleKey}_provider` as keyof typeof form;
+    const modelField    = `${roleKey}_model` as keyof typeof form;
+    return (
+      <Section title={title} desc={desc}>
+        <p className="text-xs text-neutral-500 mb-3">
+          פעיל כרגע: <span className="font-medium text-neutral-700">
+            {PROVIDER_LABELS[eff.provider ?? ""] ?? eff.provider ?? "ברירת מחדל"}
+            {eff.model ? ` · ${eff.model}` : ""}
+          </span>
+          <span className="text-neutral-400"> ({eff.source === "settings" ? "מהמסך הזה" : "מהגדרות השרת"})</span>
+        </p>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <select
+            value={form[providerField]}
+            onChange={e => setForm(p => ({ ...p, [providerField]: e.target.value }))}
+            className="px-3 py-2 text-sm border border-neutral-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+          >
+            <option value="">ברירת מחדל של השרת</option>
+            {config.configured.map(p => (
+              <option key={p} value={p}>{PROVIDER_LABELS[p] ?? p}</option>
+            ))}
+          </select>
+          <input
+            value={form[modelField]}
+            onChange={e => setForm(p => ({ ...p, [modelField]: e.target.value }))}
+            className="px-3 py-2 text-sm border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono placeholder:font-sans"
+            placeholder={MODEL_HINTS[form[providerField]] ?? "שם מודל (ריק = ברירת מחדל)"}
+            dir="ltr"
+          />
+        </div>
+      </Section>
+    );
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Connected providers */}
+      <Section title="ספקים מחוברים" desc="ספק נחשב מחובר כשמפתח API אמיתי מוגדר בשרת. המפתחות עצמם אינם מוצגים כאן.">
+        <div className="flex flex-wrap gap-2">
+          {Object.entries(PROVIDER_LABELS).map(([key, label]) => {
+            const on = config.configured.includes(key);
+            return (
+              <span key={key} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border ${
+                on ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+                   : "bg-neutral-50 border-neutral-200 text-neutral-400"
+              }`}>
+                {on ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />}
+                {label}
+              </span>
+            );
+          })}
+        </div>
+      </Section>
+
+      {roleBlock("interview", "מודל הריאיון", "מנהל את השיחה עם המועמד — 7 קריאות לריאיון, איכות תחקור חשובה")}
+      {roleBlock("scoring",   "מודל הניקוד",  "קורא את התמליל וקובע את הציון — קריאה אחת לריאיון, כדאי החזק ביותר")}
+
+      {error && (
+        <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
+      )}
+
+      <div className="flex items-center gap-3">
+        <button
+          onClick={save}
+          disabled={saving}
+          className="flex items-center gap-2 px-5 py-2.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
+        >
+          {saved ? <CheckCircle2 className="w-4 h-4" /> : null}
+          {saving ? "שומר…" : saved ? "נשמר ✓" : "שמור"}
+        </button>
+        <span className="text-xs text-neutral-400">שינוי נכנס לתוקף תוך דקה, בלי פריסה מחדש</span>
+      </div>
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "general",       label: "כללי",       icon: <Building2     className="w-4 h-4" /> },
+  { id: "ai",            label: "חיבור AI",   icon: <Wifi          className="w-4 h-4" /> },
   { id: "whatsapp",      label: "WhatsApp",   icon: <MessageCircle className="w-4 h-4" /> },
   { id: "notifications", label: "התראות",     icon: <Bell          className="w-4 h-4" /> },
   { id: "agent",         label: "סוכן AI",    icon: <Bot           className="w-4 h-4" /> },
@@ -478,6 +645,7 @@ export default function SettingsPage() {
 
       {/* Content */}
       {tab === "general"       && <GeneralTab />}
+      {tab === "ai"            && <AiTab />}
       {tab === "whatsapp"      && <WhatsAppTab />}
       {tab === "notifications" && <NotificationsTab />}
       {tab === "agent"         && <AgentTab />}

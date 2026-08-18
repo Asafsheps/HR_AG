@@ -108,6 +108,44 @@ export type Database = {
           },
         ]
       }
+      ai_settings: {
+        Row: {
+          default_provider: string | null
+          interview_model: string | null
+          interview_provider: string | null
+          organization_id: string
+          scoring_model: string | null
+          scoring_provider: string | null
+          updated_at: string
+        }
+        Insert: {
+          default_provider?: string | null
+          interview_model?: string | null
+          interview_provider?: string | null
+          organization_id: string
+          scoring_model?: string | null
+          scoring_provider?: string | null
+          updated_at?: string
+        }
+        Update: {
+          default_provider?: string | null
+          interview_model?: string | null
+          interview_provider?: string | null
+          organization_id?: string
+          scoring_model?: string | null
+          scoring_provider?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_settings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_usage_logs: {
         Row: {
           candidate_id: string | null

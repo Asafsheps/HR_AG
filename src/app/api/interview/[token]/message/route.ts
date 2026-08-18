@@ -14,7 +14,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { apiSuccess, apiError } from "@/lib/utils";
 import { checkRateLimit } from "@/lib/security/rate-limiter";
 import { sanitizeMessage } from "@/lib/security/prompt-safety";
-import { callAI, aiRoleOptions } from "@/lib/ai/providers";
+import { callAI } from "@/lib/ai/providers";
+import { aiRoleOptionsFor } from "@/lib/ai/settings";
 import { buildInterviewerPrompt, wrapCandidateTurn, shouldEnd } from "@/lib/interview/prompt";
 import { loadSession, appendTurn, endSession, addFlags, bumpQualified } from "@/lib/interview/store";
 import { scoreInterview } from "@/lib/interview/scorer";
@@ -114,7 +115,8 @@ export async function POST(req: NextRequest, { params }: Params) {
       systemPrompt,
       maxTokens: 1400,
       temperature: 0.7,
-      ...aiRoleOptions("interview"),
+      // Settings-screen override first, env defaults second.
+      ...(await aiRoleOptionsFor("interview", session.organizationId)),
     });
     reply = res.content.trim();
   } catch (e) {
