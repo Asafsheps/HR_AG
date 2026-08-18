@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, Briefcase, Users, MessageSquare,
-  BarChart2, Settings, LogOut, ChevronLeft, Bot,
+  BarChart2, Settings, LogOut, ChevronLeft, Bot, Megaphone,
 } from "lucide-react";
 import { logoutAction } from "@/lib/auth/actions";
 import { APP_NAME } from "@/lib/constants";
@@ -13,6 +13,7 @@ import { APP_NAME } from "@/lib/constants";
 const NAV_ITEMS = [
   { href: "/dashboard",      label: "דשבורד",       icon: LayoutDashboard },
   { href: "/jobs",           label: "משרות",         icon: Briefcase },
+  { href: "/campaigns",      label: "קמפיינים",      icon: Megaphone },
   { href: "/candidates",     label: "מועמדים",       icon: Users },
   { href: "/agent",          label: "סוכן AI",       icon: Bot,            badge: "חדש" },
   { href: "/conversations",  label: "שיחות",         icon: MessageSquare },
