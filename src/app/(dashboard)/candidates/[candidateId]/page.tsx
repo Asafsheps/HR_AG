@@ -39,7 +39,10 @@ interface Assignment {
   id: string; candidate_id: string; title: string; description: string;
   instructions: string; deadline_hours: number; status: string;
   sent_at: string | null; submission: AssignmentSubmission | null;
-  whatsapp_message: string;
+  // Public submission link; delivery is by email for now (WhatsApp later).
+  link?: string;
+  whatsapp_message?: string | null;
+  email?: { to: string; subject: string; body: string };
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -135,6 +138,7 @@ export default function CandidateProfilePage() {
   const [assignForm, setAssignForm] = useState({ title: "", description: "", instructions: "", deadline_hours: 48 });
   const [assignGenerating, setAssignGenerating] = useState(false);
   const [assignSending, setAssignSending] = useState(false);
+  const [linkCopied, setLinkCopied]       = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -538,7 +542,7 @@ export default function CandidateProfilePage() {
                     <div className="text-center">
                       <p className="font-medium text-neutral-800">לא נשלחה מטלה עדיין</p>
                       <p className="text-sm text-neutral-500 mt-1 max-w-xs">
-                        שלח מטלה למועמד דרך WhatsApp. הסוכן יצור מטלה מותאמת אישית לפי תיאור התפקיד ופרופיל המועמד.
+                        המטלה נשלחת למייל שהמועמד השאיר. הסוכן יכול לנסח מטלה מותאמת לפי תיאור התפקיד — ואתה מאשר לפני שליחה.
                       </p>
                     </div>
                     <button
@@ -591,18 +595,59 @@ export default function CandidateProfilePage() {
                     </div>
                   </Card>
 
-                  {/* WhatsApp message preview */}
+                  {/* Delivery — email for now, WhatsApp is a later phase.
+                      mailto keeps delivery in the recruiter's own mailbox:
+                      the candidate replies to a real human address. */}
                   <Card>
                     <h3 className="text-sm font-semibold text-neutral-700 mb-3 flex items-center gap-1.5">
-                      <MessageSquare className="w-4 h-4 text-[#25D366]" />
-                      הודעת WhatsApp שנשלחה
+                      <Send className="w-4 h-4 text-primary-500" />
+                      שליחה למועמד
                     </h3>
-                    <div className="bg-[#e5ddd5] rounded-xl p-3">
-                      <div className="bg-white rounded-xl px-4 py-3 max-w-xs text-sm text-neutral-800 whitespace-pre-wrap leading-relaxed shadow-sm">
-                        {assignment.whatsapp_message}
-                      </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <a
+                        href={`mailto:${encodeURIComponent(candidate?.email ?? "")}?subject=${encodeURIComponent(
+                          assignment.email?.subject ?? `המשך תהליך — ${assignment.title}`
+                        )}&body=${encodeURIComponent(
+                          assignment.email?.body ??
+                          `שלום ${candidate?.full_name ?? ""},\n\nהשלב הבא בתהליך הוא מטלה קצרה.\nהקישור למטלה: ${assignment.link ?? ""}\nזמן הגשה: עד ${assignment.deadline_hours} שעות.\n\nבהצלחה!\nHR AG`
+                        )}`}
+                        className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-medium rounded-lg transition-colors"
+                      >
+                        <Send className="w-4 h-4" />
+                        פתח מייל מוכן לשליחה
+                      </a>
+                      {assignment.link && (
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(assignment.link!);
+                            setLinkCopied(true);
+                            setTimeout(() => setLinkCopied(false), 2000);
+                          }}
+                          className="flex items-center gap-2 px-4 py-2 border border-neutral-300 hover:border-primary-400 text-sm text-neutral-700 rounded-lg transition-colors"
+                        >
+                          {linkCopied ? "הועתק ✓" : "העתק קישור למטלה"}
+                        </button>
+                      )}
+                      <span className="text-xs text-neutral-400">
+                        אל: {candidate?.email} · וואטסאפ — בהמשך
+                      </span>
                     </div>
                   </Card>
+
+                  {/* Legacy demo-mode WhatsApp preview */}
+                  {assignment.whatsapp_message && (
+                    <Card>
+                      <h3 className="text-sm font-semibold text-neutral-700 mb-3 flex items-center gap-1.5">
+                        <MessageSquare className="w-4 h-4 text-[#25D366]" />
+                        הודעת WhatsApp
+                      </h3>
+                      <div className="bg-[#e5ddd5] rounded-xl p-3">
+                        <div className="bg-white rounded-xl px-4 py-3 max-w-xs text-sm text-neutral-800 whitespace-pre-wrap leading-relaxed shadow-sm">
+                          {assignment.whatsapp_message}
+                        </div>
+                      </div>
+                    </Card>
+                  )}
 
                   {/* Submission */}
                   {assignment.submission && (
