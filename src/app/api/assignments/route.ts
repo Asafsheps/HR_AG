@@ -148,7 +148,9 @@ ${candidate.job.ai_instructions ? `דגשים מהמגייס: ${candidate.job.ai
 החזר JSON בלבד:
 {"title": "כותרת קצרה", "description": "פסקה שמסבירה מה בודקים ולמה", "instructions": "הוראות מפורטות צעד-צעד, כולל מה בדיוק להגיש"}`,
         }],
-        { maxTokens: 2500, temperature: 0.5 }
+        // 6000: reasoning models spend thinking tokens inside this budget;
+        // 2500 came back truncated mid-JSON in production.
+        { maxTokens: 6000, temperature: 0.5 }
       );
 
       const c = res.content.trim();
