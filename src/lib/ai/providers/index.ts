@@ -31,7 +31,9 @@ const REQUIRED_KEY: Partial<Record<AIProvider, string>> = {
  * failure this check exists to prevent.
  */
 export function configuredProviders(): AIProvider[] {
-  const out: AIProvider[] = ["ollama"];   // always available if the server runs
+  // Ollama runs on Asaf's machine — it exists in local dev but not on
+  // Vercel, where offering it in the settings UI would break interviews.
+  const out: AIProvider[] = process.env.VERCEL ? [] : ["ollama"];
 
   for (const [provider, envVar] of Object.entries(REQUIRED_KEY) as [AIProvider, string][]) {
     const v = process.env[envVar]?.trim();
