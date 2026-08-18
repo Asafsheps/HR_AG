@@ -293,6 +293,50 @@ export async function appendTurn(params: {
   }
 }
 
+/**
+ * Store the original CV file and record consent.
+ *
+ * The file itself matters, not just its extracted text: the end of the
+ * business flow is emailing the candidate's CV to the hiring company, and
+ * an extracted-text-only pipeline has nothing to attach. Path follows the
+ * bucket convention {organization_id}/{candidate_id}/cv.<ext>.
+ */
+export async function saveCvAndConsent(params: {
+  candidateId:    string;
+  organizationId: string;
+  cv: { bytes: ArrayBuffer; contentType: string; ext: string } | null;
+  consentVersion: string;
+}): Promise<void> {
+  const supabase = adminClient();
+
+  let cvPath: string | null = null;
+  if (params.cv) {
+    const path = `${params.organizationId}/${params.candidateId}/cv.${params.cv.ext}`;
+    // upsert: a returning candidate re-applying replaces their old file
+    // instead of erroring on the existing object.
+    const { error } = await supabase.storage
+      .from("cv-uploads")
+      .upload(path, params.cv.bytes, { contentType: params.cv.contentType, upsert: true });
+
+    if (error) {
+      // The interview must not die because storage hiccuped — the extracted
+      // text is already saved and the candidate is mid-flow. Log and go on.
+      console.error("[interview] CV upload failed:", error.message);
+    } else {
+      cvPath = path;
+    }
+  }
+
+  await supabase
+    .from("candidates")
+    .update({
+      ...(cvPath ? { cv_url: cvPath } : {}),
+      consent_at:      new Date().toISOString(),
+      consent_version: params.consentVersion,
+    })
+    .eq("id", params.candidateId);
+}
+
 /** Bump a campaign's conversion counter. */
 export async function bumpConversions(code: string): Promise<void> {
   const supabase = adminClient();

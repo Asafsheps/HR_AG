@@ -13,7 +13,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { apiSuccess, apiError } from "@/lib/utils";
-import type { DbCandidateStatus, DbGender } from "@/types/database";
+import type { DbCandidateStatus, DbGender } from "@/types/database-helpers";
 
 // Mirror the enums in supabase/migrations. Used to narrow untrusted query
 // parameters instead of asserting them.

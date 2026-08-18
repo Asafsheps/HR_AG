@@ -55,6 +55,7 @@ export default function CampaignLandingPage({ params }: { params: Promise<{ code
 
   const [form, setForm] = useState({ full_name: "", phone: "", email: "" });
   const [cvFile, setCvFile] = useState<File | null>(null);
+  const [consent, setConsent] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -77,6 +78,7 @@ export default function CampaignLandingPage({ params }: { params: Promise<{ code
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = "כתובת מייל לא תקינה";
     if (!cvFile) e.cv = "נא לצרף קורות חיים";
+    if (!consent) e.consent = "כדי להמשיך יש לאשר את שמירת הפרטים והעברתם";
 
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -103,6 +105,7 @@ export default function CampaignLandingPage({ params }: { params: Promise<{ code
       fd.append("full_name", form.full_name);
       fd.append("phone",     form.phone);
       fd.append("email",     form.email);
+      fd.append("consent",   String(consent));
       if (cvFile) fd.append("cv", cvFile);
 
       const r = await fetch("/api/interview/start", { method: "POST", body: fd });
@@ -262,6 +265,30 @@ export default function CampaignLandingPage({ params }: { params: Promise<{ code
               )}
             </Field>
 
+            {/* Consent — an explicit required action, not a passive footnote.
+                The CV is forwarded to the hiring company, and that transfer
+                needs recorded agreement; the server rejects without it. */}
+            <div>
+              <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={consent}
+                  onChange={e => {
+                    setConsent(e.target.checked);
+                    if (e.target.checked) {
+                      setErrors(p => { const n = { ...p }; delete n.consent; return n; });
+                    }
+                  }}
+                  className="mt-0.5 w-4 h-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500 shrink-0"
+                />
+                <span className="text-xs text-neutral-600 leading-relaxed">
+                  אני מאשר/ת שהפרטים וקורות החיים שלי יישמרו במערכת לצורך תהליך הגיוס,
+                  ויועברו לחברה המגייסת עבור משרה זו. ניתן לבקש הסרה בכל עת.
+                </span>
+              </label>
+              {errors.consent && <p className="text-xs text-red-600 mt-1">{errors.consent}</p>}
+            </div>
+
             {errors._ && (
               <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
                 {errors._}
@@ -277,10 +304,6 @@ export default function CampaignLandingPage({ params }: { params: Promise<{ code
                 ? <><Loader2 className="w-4 h-4 animate-spin" />מתחיל…</>
                 : <><MessageCircle className="w-4 h-4" />בוא נדבר</>}
             </button>
-
-            <p className="text-xs text-neutral-400 text-center">
-              בשליחה אתה מאשר שנשמור את פרטיך ונפנה אליך בנוגע למשרה זו ולמשרות דומות.
-            </p>
           </form>
         </section>
       </main>

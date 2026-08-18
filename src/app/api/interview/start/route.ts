@@ -17,9 +17,19 @@ import { checkRateLimit } from "@/lib/security/rate-limiter";
 import { sanitizeCvText } from "@/lib/security/prompt-safety";
 import { extractCvText } from "@/lib/interview/cv-text";
 import { newSessionToken } from "@/lib/interview/session";
-import { loadCampaignConfig, createSession, bumpConversions } from "@/lib/interview/store";
+import { loadCampaignConfig, createSession, saveCvAndConsent, bumpConversions } from "@/lib/interview/store";
 
 const MAX_CV_BYTES = 5 * 1024 * 1024;
+
+// Bump whenever the consent wording on the landing page changes, so the
+// record shows which text each candidate actually agreed to.
+const CONSENT_VERSION = "v1-2026-08";
+
+const CV_TYPES: Record<string, string> = {
+  pdf:  "application/pdf",
+  doc:  "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+};
 
 function getIp(req: NextRequest): string {
   return req.headers.get("x-forwarded-for")?.split(",")[0].trim()
@@ -46,14 +56,22 @@ export async function POST(req: NextRequest) {
   const full_name = String(form.get("full_name") ?? "").trim();
   const phone     = String(form.get("phone") ?? "").trim();
   const email     = String(form.get("email") ?? "").trim();
+  const consent   = String(form.get("consent") ?? "");
   const cv        = form.get("cv");
 
   if (!/^[A-Z0-9]{3,12}$/.test(code))            return NextResponse.json(apiError("קוד קמפיין לא תקין"), { status: 400 });
   if (full_name.length < 2)                      return NextResponse.json(apiError("נא להזין שם מלא"), { status: 400 });
   if (phone.replace(/\D/g, "").length < 9)       return NextResponse.json(apiError("מספר טלפון לא תקין"), { status: 400 });
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return NextResponse.json(apiError("כתובת מייל לא תקינה"), { status: 400 });
+  // Enforced server-side: unticking the checkbox in devtools must not work.
+  // Without recorded consent the CV cannot be forwarded to the client
+  // company, which voids the whole pipeline for this candidate.
+  if (consent !== "true")                        return NextResponse.json(apiError("נדרש אישור לשמירת הפרטים והעברתם לחברה המגייסת"), { status: 400 });
   if (!(cv instanceof File))                     return NextResponse.json(apiError("נא לצרף קורות חיים"), { status: 400 });
   if (cv.size > MAX_CV_BYTES)                    return NextResponse.json(apiError("הקובץ גדול מ-5MB"), { status: 400 });
+
+  const cvExt = cv.name.split(".").pop()?.toLowerCase() ?? "";
+  if (!CV_TYPES[cvExt]) return NextResponse.json(apiError("פורמט קובץ לא נתמך — PDF או Word בלבד"), { status: 400 });
 
   const config = await loadCampaignConfig(code);
   if (!config) return NextResponse.json(apiError("הקמפיין לא נמצא או הסתיים"), { status: 404 });
@@ -99,6 +117,15 @@ export async function POST(req: NextRequest) {
       { status: 409 }
     );
   }
+
+  // Store the original file and record the consent that allows forwarding
+  // it. Non-fatal by design — see saveCvAndConsent.
+  await saveCvAndConsent({
+    candidateId:    result.candidateId,
+    organizationId: config.organizationId,
+    cv: { bytes: await cv.arrayBuffer(), contentType: CV_TYPES[cvExt], ext: cvExt },
+    consentVersion: CONSENT_VERSION,
+  }).catch(e => console.error("[interview] saveCvAndConsent failed:", e));
 
   // Only count a conversion once. A resumed session was already counted,
   // and double-counting would make the funnel report look better than it is.

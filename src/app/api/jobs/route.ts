@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { createJobSchema } from "@/lib/validators/job";
 import { slugify, apiSuccess, apiError } from "@/lib/utils";
-import type { DbJobStatus } from "@/types/database";
+import type { DbJobStatus } from "@/types/database-helpers";
 import { agentGuidanceSchema } from "@/lib/validators/agent";
 import { generateCampaignCode, landingUrl } from "@/lib/campaigns/code";
 
