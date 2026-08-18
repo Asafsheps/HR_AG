@@ -57,12 +57,13 @@ export async function GET(
     return NextResponse.json(apiError("מועמד לא נמצא"), { status: 404 });
   }
 
-  // Fetch WhatsApp messages
+  // Conversation history — web chat and WhatsApp alike. Real columns are
+  // content/sent_at; aliased to the keys the profile page reads.
   const { data: messages } = await db
     .from("messages")
-    .select("id, direction, sender, body, created_at")
+    .select("id, direction, sender, body:content, created_at:sent_at")
     .eq("candidate_id", id)
-    .order("created_at", { ascending: true })
+    .order("sent_at", { ascending: true })
     .limit(200);
 
   // Fetch notes
