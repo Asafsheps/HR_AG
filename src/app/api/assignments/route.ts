@@ -43,7 +43,13 @@ function toUi(row: any) {
     whatsapp_message: null,
     submission: submitted ? {
       type:               row.submission_url ? "url" : "text",
-      content:            row.submission_url ?? row.submission_text,
+      // A non-http submission_url is a private-bucket path (uploaded file);
+      // route it through the signing endpoint so the link actually opens.
+      content: row.submission_url
+        ? (/^https?:\/\//i.test(row.submission_url)
+            ? row.submission_url
+            : `/api/assignments/${row.id}/file`)
+        : row.submission_text,
       submitted_at:       row.submitted_at,
       evaluation_score:   ev?.score ?? null,
       evaluation_summary: ev?.summary ?? null,

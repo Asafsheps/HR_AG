@@ -53,8 +53,10 @@ export async function POST(request: NextRequest, { params }: Params) {
       .upload(fileName, buffer, { contentType: file.type, upsert: false });
 
     if (!uploadErr) {
-      const { data: urlData } = supabase.storage.from("assignment-submissions").getPublicUrl(fileName);
-      fileUrl = urlData.publicUrl;
+      // Store the bucket PATH, not a "public" URL — the bucket is private,
+      // so a public URL 404s for everyone. The recruiter downloads through
+      // /api/assignments/[id]/file, which signs a short-lived URL.
+      fileUrl = fileName;
     }
   }
 
@@ -93,6 +95,13 @@ export async function POST(request: NextRequest, { params }: Params) {
     .from("candidates")
     .update({ status: "assignment_submitted" })
     .eq("id", assignment.candidate_id);
+
+  // Evaluate in the same request, mirroring how interviews are scored on
+  // completion: the recruiter opens the profile and sees a verdict, not a
+  // row stuck on "ממתינה להערכה". Non-fatal — the submission is saved
+  // either way, and evaluateAssignment swallows its own errors.
+  const { evaluateAssignment } = await import("@/lib/assignments/evaluator");
+  await evaluateAssignment(id).catch(e => console.error("[submit] evaluation failed:", e));
 
   return NextResponse.json(apiSuccess({ submitted: true }));
 }

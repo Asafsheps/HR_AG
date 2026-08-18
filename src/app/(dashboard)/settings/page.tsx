@@ -322,7 +322,7 @@ function WhatsAppTab() {
       <Section title="איך הבוט עובד" desc="תהליך שלם מהגשת מועמדות עד ריאיון WhatsApp">
         <div className="space-y-3">
           {[
-            { step: "1", title: "מועמד ממלא טופס", desc: "בדף /apply/[slug] — שם, מייל, טלפון, קורות חיים", color: "bg-primary-100 text-primary-700" },
+            { step: "1", title: "מועמד ממלא טופס", desc: "בעמוד הנחיתה /j/[קוד] — שם, מייל, טלפון, קורות חיים", color: "bg-primary-100 text-primary-700" },
             { step: "2", title: "הפנייה לוואטסאפ", desc: "לאחר שליחה, המועמד מועבר לשיחת WhatsApp עם הבוט", color: "bg-green-100 text-green-700" },
             { step: "3", title: "סוכן AI מנהל ריאיון", desc: "שואל שאלות מוגדרות, מנקד תשובות ב-real time", color: "bg-violet-100 text-violet-700" },
             { step: "4", title: "ציון ≥ סף → שלב הבא", desc: "שולח מטלה אוטומטית, או מעביר למגייס בהתאם לציון", color: "bg-amber-100 text-amber-700" },
