@@ -40,7 +40,8 @@ export async function GET(req: NextRequest) {
   // Get all candidates with status + score + created_at
   const { data: candidates, error } = await db
     .from("candidates")
-    .select("status, ai_score, created_at");
+    // candidates has applied_at, not created_at; aliased for the code below.
+    .select("status, ai_score, created_at:applied_at");
 
   if (error) return NextResponse.json(apiError("שגיאה בטעינת נתונים"), { status: 500 });
 

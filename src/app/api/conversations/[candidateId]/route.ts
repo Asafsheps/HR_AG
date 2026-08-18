@@ -41,9 +41,10 @@ export async function GET(
   // Full message thread
   const { data: messages, error } = await db
     .from("messages")
-    .select("id, direction, sender, body, provider_message_id, created_at")
+    // Real columns are content/sent_at; aliased to what the UI reads.
+    .select("id, direction, sender, body:content, provider_message_id, created_at:sent_at")
     .eq("candidate_id", candidateId)
-    .order("created_at", { ascending: true });
+    .order("sent_at", { ascending: true });
 
   if (error) return NextResponse.json(apiError("שגיאה בטעינת השיחה"), { status: 500 });
 

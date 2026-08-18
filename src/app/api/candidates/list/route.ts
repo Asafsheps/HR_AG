@@ -49,13 +49,16 @@ export async function GET(request: NextRequest) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as any;
 
+  // candidates has applied_at, not created_at — selecting the wrong name
+  // fails the whole query, which surfaced as an empty candidates screen the
+  // moment demo mode stopped masking it. Aliased so the UI keys stay put.
   let query = db
     .from("candidates")
     .select(`
-      id, full_name, email, phone, status, ai_score, created_at,
+      id, full_name, email, phone, status, ai_score, created_at:applied_at,
       job:jobs ( id, title )
     `, { count: "exact" })
-    .order("created_at", { ascending: false })
+    .order("applied_at", { ascending: false })
     .range(offset, offset + limit - 1);
 
   if (q) {

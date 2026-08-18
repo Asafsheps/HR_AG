@@ -27,17 +27,20 @@ export async function GET(request: NextRequest) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as any;
 
-  // Subquery: latest message per candidate
+  // messages!inner: only candidates that actually have a conversation.
+  // The old filter was whatsapp_number IS NOT NULL, which silently hid
+  // every web-chat interview — the main channel — from this screen.
+  // Aliases map the real columns (content, sent_at) to the keys the UI
+  // already reads (body, created_at).
   let query = db
     .from("candidates")
     .select(`
       id, full_name, phone, whatsapp_number, status, ai_score, updated_at,
       job:jobs ( id, title ),
-      last_message:messages (
-        body, direction, created_at
+      last_message:messages!inner (
+        body:content, direction, created_at:sent_at
       )
     `)
-    .not("whatsapp_number", "is", null)
     .order("updated_at", { ascending: false })
     .range(offset, offset + limit - 1);
 

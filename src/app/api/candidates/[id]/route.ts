@@ -45,7 +45,7 @@ export async function GET(
       cv_url, cv_parsed_data,
       status, ai_score, ai_summary,
       whatsapp_consent, screening_answers,
-      source, created_at, updated_at,
+      source, created_at:applied_at, updated_at,
       job:jobs (
         id, title, department, location
       )
