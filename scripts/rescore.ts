@@ -6,7 +6,10 @@
 // This script picks those up: every finished conversation whose candidate
 // has no candidate_scores row gets scored again from its stored transcript.
 //
-//   npm run rescore
+//   npm run rescore                  — finished interviews only
+//   npm run rescore -- --unfinished  — also score abandoned mid-interview
+//                                      sessions (partial evidence; the
+//                                      scorer's evidence_quality reflects it)
 //
 // Safe to run repeatedly: already-scored candidates are skipped.
 
@@ -26,15 +29,23 @@ async function main() {
     { auth: { persistSession: false } }
   );
 
-  const { data: contexts, error } = await supabase
+  const includeUnfinished = process.argv.includes("--unfinished");
+
+  let query = supabase
     .from("conversation_contexts")
     .select(`
       id, candidate_id, organization_id, job_id, transcript,
       candidates ( full_name ),
       jobs ( title, description, requirements, screening_questions, ai_instructions )
     `)
-    .not("ended_at", "is", null)
     .not("candidate_id", "is", null);
+
+  // An abandoned session is scoreable too — a recruiter would still want to
+  // know what the five answered questions revealed — but only on request,
+  // since the candidate might come back and finish.
+  if (!includeUnfinished) query = query.not("ended_at", "is", null);
+
+  const { data: contexts, error } = await query;
 
   if (error) throw new Error(error.message);
 

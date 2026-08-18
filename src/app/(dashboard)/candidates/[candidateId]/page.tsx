@@ -357,11 +357,19 @@ export default function CandidateProfilePage() {
                 </a>
               )}
               {candidate.cv_url && (
-                <a href={candidate.cv_url} target="_blank" rel="noreferrer"
-                  className="flex items-center gap-2 text-sm text-primary-600 hover:text-primary-700 transition-colors font-medium">
-                  <FileText className="w-4 h-4 flex-shrink-0" />
-                  הורד קורות חיים
-                </a>
+                <div className="flex items-center gap-4">
+                  {/* Signed-URL route — cv_url itself is a private bucket
+                      path and 404s if linked directly. */}
+                  <a href={`/api/candidates/${candidate.id}/cv`} target="_blank" rel="noreferrer"
+                    className="flex items-center gap-2 text-sm text-primary-600 hover:text-primary-700 transition-colors font-medium">
+                    <FileText className="w-4 h-4 flex-shrink-0" />
+                    צפה בקורות חיים
+                  </a>
+                  <a href={`/api/candidates/${candidate.id}/cv?download=1`}
+                    className="flex items-center gap-2 text-sm text-neutral-500 hover:text-primary-700 transition-colors">
+                    הורדה
+                  </a>
+                </div>
               )}
             </div>
           </Card>
