@@ -94,7 +94,7 @@ export default function CampaignsPage() {
     // Optimistic: the row flips immediately, and flips back if the server
     // disagrees. Waiting on a round-trip for a toggle feels broken.
     setCampaigns(p => p.map(x => x.id === c.id ? { ...x, is_active: !c.is_active } : x));
-    const r = await fetch(`/api/campaigns/${c.id}`, {
+    const r = await fetch(`/api/campaigns/${c.code}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ is_active: !c.is_active }),
