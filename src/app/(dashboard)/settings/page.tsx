@@ -500,7 +500,6 @@ function AiTab() {
       .catch(() => setError("שגיאת רשת"))
       .finally(() => setLoading(false));
   };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load(); }, []);
 
   async function save() {
